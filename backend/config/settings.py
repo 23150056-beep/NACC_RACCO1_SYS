@@ -71,8 +71,7 @@ DATABASES = {
     }
 }
 
-# NOTE: AUTH_USER_MODEL is set in Task 2 (after the custom User model exists),
-# before the first migration is ever run.
+AUTH_USER_MODEL = "accounts.User"
 
 
 # Password validation
