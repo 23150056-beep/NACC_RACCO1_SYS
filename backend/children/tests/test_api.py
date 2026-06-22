@@ -34,6 +34,13 @@ class ChildApiTest(APITestCase):
         resp = self.client.post("/api/children/", {"fullname": "X"})
         self.assertEqual(resp.status_code, 403)
 
+    def test_counselor_can_view_children(self):
+        Child.objects.create(fullname="Visible Child", case_type="Foster")
+        self._auth("c@racco1.gov.ph", "couns1234")
+        resp = self.client.get("/api/children/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 1)
+
     def test_archive_child_hides_from_list(self):
         self._auth("staff@racco1.gov.ph", "staff1234")
         child = Child.objects.create(fullname="Ana Lopez", case_type="Adoption")

@@ -1,4 +1,4 @@
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import BasePermission, SAFE_METHODS
 from accounts.models import Role
 
 
@@ -17,3 +17,20 @@ class IsAdminOrStaff(BasePermission):
     def has_permission(self, request, view):
         return bool(request.user and request.user.is_authenticated
                     and _role_name(request) in (Role.ADMINISTRATOR, Role.STAFF))
+
+
+class RecordsAccess(BasePermission):
+    """Read access for Admin/Staff/Counselor; write access for Admin/Staff only.
+
+    Counselors can VIEW child/guardian records (per the RBAC matrix) but cannot
+    create, edit, archive, or delete them. Per-counselor "assigned only" filtering
+    is deferred to Phase 2 (when assessments establish the assignment link).
+    """
+
+    def has_permission(self, request, view):
+        if not (request.user and request.user.is_authenticated):
+            return False
+        role = _role_name(request)
+        if request.method in SAFE_METHODS:
+            return role in (Role.ADMINISTRATOR, Role.STAFF, Role.COUNSELOR)
+        return role in (Role.ADMINISTRATOR, Role.STAFF)

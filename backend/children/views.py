@@ -1,13 +1,13 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from accounts.permissions import IsAdminOrStaff
+from accounts.permissions import RecordsAccess
 from children.models import Guardian, Child
 from children.serializers import GuardianSerializer, ChildSerializer
 
 
 class _ArchivableViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [RecordsAccess]
     pagination_class = None
     model = None
 
