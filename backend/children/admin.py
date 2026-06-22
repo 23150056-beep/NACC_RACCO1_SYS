@@ -1,3 +1,5 @@
 from django.contrib import admin
+from children.models import Guardian, Child
 
-# Register your models here.
+admin.site.register(Guardian)
+admin.site.register(Child)
