@@ -13,11 +13,8 @@ export const caseTrends = [
   { month: 'May', count: 38 },
 ];
 
-export const mockChildren = [
-  { id: 'C-1001', name: 'Juan Dela Cruz', age: 8, status: 'Needs Counseling', concern: 'Trauma', counselor: 'Unassigned' },
-  { id: 'C-1002', name: 'Maria Santos', age: 12, status: 'Ongoing', concern: 'Behavioral', counselor: 'Dr. Reyes' },
-  { id: 'C-1003', name: 'Pedro Penduko', age: 6, status: 'Completed', concern: 'Adjustment', counselor: 'Dr. Lim' },
-];
+// NOTE: dashboard demo data only. Real children come from the API (see pages/Children.jsx).
+// Dashboard wiring to live data lands in Phase 4.
 
 export const mockActivityFeed = [
   { id: 1, text: 'Session 3 completed for Juan Dela Cruz', time: '2 hours ago' },

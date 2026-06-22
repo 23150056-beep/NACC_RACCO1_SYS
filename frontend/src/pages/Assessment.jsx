@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { mockChildren } from '../data/mockData';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '../api/client';
 
 export default function Assessment() {
   const navigate = useNavigate();
@@ -9,6 +9,8 @@ export default function Assessment() {
   const [sessionDetails, setSessionDetails] = useState({ date: '', type: 'Intake' });
   const [answers, setAnswers] = useState({ q1: null, q2: null, q3: null });
   const [aiResult, setAiResult] = useState(null);
+  const [children, setChildren] = useState([]);
+  useEffect(() => { api.get('/children/').then((r) => setChildren(r.data)); }, []);
 
   const calculateAIResult = () => {
     const score = (answers.q1 || 0) + (answers.q2 || 0) + (answers.q3 || 0);
@@ -69,8 +71,8 @@ export default function Assessment() {
               onChange={(e) => setSelectedChild(e.target.value)}
             >
               <option value="">-- Select a child profile --</option>
-              {mockChildren.map(c => (
-                <option key={c.id} value={c.id}>{c.id}: {c.name} ({c.status})</option>
+              {children.map(c => (
+                <option key={c.id} value={c.id}>{c.fullname} ({c.case_type || 'n/a'})</option>
               ))}
             </select>
           </div>
