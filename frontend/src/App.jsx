@@ -11,6 +11,7 @@ import Assessment from './pages/Assessment';
 import Report from './pages/Report';
 import Compliance from './pages/Compliance';
 import Settings from './pages/Settings';
+import Users from './pages/Users';
 
 function Shell({ children }) {
   return (
@@ -35,7 +36,7 @@ export default function App() {
           <Route path="/assessment" element={<ProtectedRoute roles={['Administrator', 'Counselor']}><Shell><Assessment /></Shell></ProtectedRoute>} />
           <Route path="/report" element={<ProtectedRoute><Shell><Report /></Shell></ProtectedRoute>} />
           <Route path="/compliance" element={<ProtectedRoute><Shell><Compliance /></Shell></ProtectedRoute>} />
-          {/* /users route is added in Task 11 together with the Users page */}
+          <Route path="/users" element={<ProtectedRoute roles={['Administrator']}><Shell><Users /></Shell></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Shell><Settings /></Shell></ProtectedRoute>} />
         </Routes>
       </BrowserRouter>
