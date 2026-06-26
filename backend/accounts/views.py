@@ -9,6 +9,8 @@ from accounts.permissions import IsAdministrator
 from accounts.serializers import (
     LoginSerializer, UserSerializer, UserWriteSerializer, RoleSerializer,
 )
+from activity.models import ActivityLog
+from activity.services import log_activity
 
 User = get_user_model()
 
@@ -40,12 +42,28 @@ class UserViewSet(viewsets.ModelViewSet):
             return UserWriteSerializer
         return UserSerializer
 
+    def _log(self, user, action_name):
+        log_activity(
+            self.request.user, action_name, ActivityLog.USER,
+            entity_type="User",
+            entity_label=(user.fullname or user.email),
+            entity_id=user.id)
+
+    def perform_create(self, serializer):
+        user = serializer.save()
+        self._log(user, ActivityLog.CREATED)
+
+    def perform_update(self, serializer):
+        user = serializer.save()
+        self._log(user, ActivityLog.UPDATED)
+
     @action(detail=True, methods=["post"])
     def archive(self, request, pk=None):
         user = self.get_object()
         user.status = User.ARCHIVED
         user.is_active = False
         user.save(update_fields=["status", "is_active", "updated_at"])
+        self._log(user, ActivityLog.ARCHIVED)
         return Response({"status": "archived"}, status=status.HTTP_200_OK)
 
 

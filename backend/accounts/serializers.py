@@ -2,6 +2,8 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth import get_user_model
 from accounts.models import Role
+from activity.models import ActivityLog
+from activity.services import log_activity
 
 User = get_user_model()
 
@@ -62,4 +64,5 @@ class LoginSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         data = super().validate(attrs)
         data["user"] = UserSerializer(self.user).data
+        log_activity(self.user, ActivityLog.LOGIN, ActivityLog.SECURITY)
         return data
