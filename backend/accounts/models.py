@@ -6,7 +6,7 @@ from accounts.managers import UserManager
 
 class Role(models.Model):
     ADMINISTRATOR = "Administrator"
-    COUNSELOR = "Counselor"
+    PSYCHOLOGIST = "Psychologist"
     STAFF = "Staff"
 
     role_name = models.CharField(max_length=50, unique=True)

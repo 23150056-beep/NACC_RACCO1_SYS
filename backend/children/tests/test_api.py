@@ -9,13 +9,13 @@ User = get_user_model()
 class ChildApiTest(APITestCase):
     def setUp(self):
         self.staff_role = Role.objects.create(role_name=Role.STAFF)
-        self.counselor_role = Role.objects.create(role_name=Role.COUNSELOR)
+        self.psychologist_role = Role.objects.create(role_name=Role.PSYCHOLOGIST)
         self.staff = User.objects.create_user(
             email="staff@racco1.gov.ph", username="staff", password="staff1234",
             role=self.staff_role)
-        self.counselor = User.objects.create_user(
+        self.psychologist = User.objects.create_user(
             email="c@racco1.gov.ph", username="c", password="couns1234",
-            role=self.counselor_role)
+            role=self.psychologist_role)
 
     def _auth(self, email, password):
         token = self.client.post("/api/auth/login/", {
@@ -29,12 +29,12 @@ class ChildApiTest(APITestCase):
         self.assertEqual(resp.status_code, 201)
         self.assertTrue(Child.objects.filter(fullname="Juan Cruz").exists())
 
-    def test_counselor_cannot_create_child(self):
+    def test_psychologist_cannot_create_child(self):
         self._auth("c@racco1.gov.ph", "couns1234")
         resp = self.client.post("/api/children/", {"fullname": "X"})
         self.assertEqual(resp.status_code, 403)
 
-    def test_counselor_can_view_children(self):
+    def test_psychologist_can_view_children(self):
         Child.objects.create(fullname="Visible Child", case_type="Foster")
         self._auth("c@racco1.gov.ph", "couns1234")
         resp = self.client.get("/api/children/")

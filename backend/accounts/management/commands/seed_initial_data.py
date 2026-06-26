@@ -9,7 +9,7 @@ class Command(BaseCommand):
     help = "Seed default roles and an initial administrator account."
 
     def handle(self, *args, **options):
-        for name in [Role.ADMINISTRATOR, Role.COUNSELOR, Role.STAFF]:
+        for name in [Role.ADMINISTRATOR, Role.PSYCHOLOGIST, Role.STAFF]:
             Role.objects.get_or_create(role_name=name)
         self.stdout.write(self.style.SUCCESS("Roles seeded."))
 

@@ -20,10 +20,10 @@ class IsAdminOrStaff(BasePermission):
 
 
 class RecordsAccess(BasePermission):
-    """Read access for Admin/Staff/Counselor; write access for Admin/Staff only.
+    """Read access for Admin/Staff/Psychologist; write access for Admin/Staff only.
 
-    Counselors can VIEW child/guardian records (per the RBAC matrix) but cannot
-    create, edit, archive, or delete them. Per-counselor "assigned only" filtering
+    Psychologists can VIEW child/guardian records (per the RBAC matrix) but cannot
+    create, edit, archive, or delete them. Per-psychologist "assigned only" filtering
     is deferred to Phase 2 (when assessments establish the assignment link).
     """
 
@@ -32,5 +32,5 @@ class RecordsAccess(BasePermission):
             return False
         role = _role_name(request)
         if request.method in SAFE_METHODS:
-            return role in (Role.ADMINISTRATOR, Role.STAFF, Role.COUNSELOR)
+            return role in (Role.ADMINISTRATOR, Role.STAFF, Role.PSYCHOLOGIST)
         return role in (Role.ADMINISTRATOR, Role.STAFF)

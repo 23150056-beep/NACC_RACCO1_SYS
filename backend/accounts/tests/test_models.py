@@ -7,7 +7,7 @@ User = get_user_model()
 
 class UserModelTest(TestCase):
     def test_create_user_with_role_and_fullname(self):
-        role = Role.objects.create(role_name=Role.COUNSELOR)
+        role = Role.objects.create(role_name=Role.PSYCHOLOGIST)
         user = User.objects.create_user(
             email="jane@racco1.gov.ph",
             username="jane",
@@ -20,4 +20,4 @@ class UserModelTest(TestCase):
         self.assertTrue(user.check_password("secret123"))
         self.assertEqual(user.fullname, "Jane D Cruz")
         self.assertEqual(user.status, User.ACTIVE)
-        self.assertEqual(user.role.role_name, "Counselor")
+        self.assertEqual(user.role.role_name, "Psychologist")

@@ -49,7 +49,7 @@ python manage.py test
 ## Roles (Phase 1)
 - **Administrator** — manages users, children, guardians; full access.
 - **Staff** — manages children & guardian records.
-- **Counselor** — read-only access to children (assessment tools arrive in Phase 2).
+- **Psychologist** — read-only access to children (assessment tools arrive in Phase 2).
 - **Child Respondent** — guided survey interface (Phase 2; not a login account).
 
 ## Build status
