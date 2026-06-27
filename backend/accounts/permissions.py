@@ -46,3 +46,14 @@ class CanManageInstruments(BasePermission):
     def has_permission(self, request, view):
         return bool(request.user and request.user.is_authenticated
                     and _role_name(request) in INSTRUMENT_MANAGER_ROLES)
+
+
+# Roles allowed to take/administer assessments. Kept SEPARATE from instrument
+# management so reverting that to admin-only never blocks taking assessments.
+ASSESSMENT_TAKER_ROLES = (Role.ADMINISTRATOR, Role.PSYCHOLOGIST)
+
+
+class CanTakeAssessments(BasePermission):
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated
+                    and _role_name(request) in ASSESSMENT_TAKER_ROLES)

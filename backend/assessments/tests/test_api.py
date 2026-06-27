@@ -94,3 +94,81 @@ class ExtractEndpointTest(QuestionnaireApiTest):
         self._auth("a@racco1.gov.ph")
         resp = self.client.post("/api/questionnaires/extract/", {}, format="multipart")
         self.assertEqual(resp.status_code, 400)
+
+
+from assessments.models import Question, Assessment, Response
+from children.models import Child
+
+
+class AssessmentTakingTest(APITestCase):
+    def setUp(self):
+        self.admin_role = Role.objects.create(role_name=Role.ADMINISTRATOR)
+        self.psy_role = Role.objects.create(role_name=Role.PSYCHOLOGIST)
+        self.staff_role = Role.objects.create(role_name=Role.STAFF)
+        self.admin = User.objects.create_user(
+            email="a@racco1.gov.ph", username="a", password="pass1234", role=self.admin_role)
+        self.psy = User.objects.create_user(
+            email="p@racco1.gov.ph", username="p", password="pass1234", role=self.psy_role)
+        self.staff = User.objects.create_user(
+            email="s@racco1.gov.ph", username="s", password="pass1234", role=self.staff_role)
+        self.child = Child.objects.create(fullname="Ana Lopez", case_type="Foster")
+        self.qn = Questionnaire.objects.create(title="SDQ", status="active")
+        self.q1 = Question.objects.create(questionnaire=self.qn, question_text="Calm?", question_type="yes_no", order=1)
+        self.q2 = Question.objects.create(questionnaire=self.qn, question_text="Sleeps?", question_type="rating_scale", order=2)
+        self.draft = Questionnaire.objects.create(title="Draft one", status="draft")
+
+    def _auth(self, email):
+        token = self.client.post("/api/auth/login/", {
+            "email": email, "password": "pass1234"}).data["access"]
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer " + token)
+
+    def _assessment_payload(self):
+        return {
+            "child": self.child.id, "questionnaire": self.qn.id, "assessment_type": "Intake",
+            "classification": "Normal Development", "notes": "Adjusting well.",
+            "responses": [
+                {"question": self.q1.id, "answer": "Yes"},
+                {"question": self.q2.id, "answer": "4"},
+            ],
+        }
+
+    def test_active_questionnaires_lists_only_active(self):
+        self._auth("p@racco1.gov.ph")
+        resp = self.client.get("/api/active-questionnaires/")
+        self.assertEqual(resp.status_code, 200)
+        titles = [q["title"] for q in resp.data]
+        self.assertIn("SDQ", titles)
+        self.assertNotIn("Draft one", titles)
+
+    def test_active_questionnaires_forbidden_for_staff(self):
+        self._auth("s@racco1.gov.ph")
+        self.assertEqual(self.client.get("/api/active-questionnaires/").status_code, 403)
+
+    def test_psychologist_creates_assessment_with_responses(self):
+        self._auth("p@racco1.gov.ph")
+        resp = self.client.post("/api/assessments/", self._assessment_payload(), format="json")
+        self.assertEqual(resp.status_code, 201)
+        a = Assessment.objects.get()
+        self.assertEqual(a.status, "completed")
+        self.assertEqual(a.psychologist, self.psy)
+        self.assertEqual(a.notes, "Adjusting well.")
+        self.assertEqual(a.responses.count(), 2)
+
+    def test_staff_cannot_create_assessment(self):
+        self._auth("s@racco1.gov.ph")
+        resp = self.client.post("/api/assessments/", self._assessment_payload(), format="json")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_psychologist_lists_only_own_assessments(self):
+        Assessment.objects.create(child=self.child, psychologist=self.admin, status="completed")
+        self._auth("p@racco1.gov.ph")
+        self.client.post("/api/assessments/", self._assessment_payload(), format="json")
+        resp = self.client.get("/api/assessments/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 1)
+
+    def test_admin_sees_all_assessments(self):
+        Assessment.objects.create(child=self.child, psychologist=self.psy, status="completed")
+        self._auth("a@racco1.gov.ph")
+        resp = self.client.get("/api/assessments/")
+        self.assertEqual(len(resp.data), 1)

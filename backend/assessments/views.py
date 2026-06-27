@@ -1,13 +1,16 @@
-from rest_framework import viewsets, status
+from rest_framework import generics, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 
-from accounts.permissions import CanManageInstruments
+from accounts.models import Role
+from accounts.permissions import CanManageInstruments, CanTakeAssessments
 from activity.models import ActivityLog
 from activity.services import log_activity
-from assessments.models import Questionnaire
-from assessments.serializers import QuestionnaireSerializer
+from assessments.models import Questionnaire, Assessment
+from assessments.serializers import (
+    QuestionnaireSerializer, AssessmentWriteSerializer, AssessmentListSerializer,
+)
 from assessments.extraction.base import ExtractionError
 from assessments.extraction.ocr_heuristic import OcrHeuristicExtractor
 
@@ -71,3 +74,34 @@ class QuestionnaireViewSet(viewsets.ModelViewSet):
         except ExtractionError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(draft, status=status.HTTP_200_OK)
+
+
+class ActiveQuestionnaireListView(generics.ListAPIView):
+    permission_classes = [CanTakeAssessments]
+    pagination_class = None
+    serializer_class = QuestionnaireSerializer
+
+    def get_queryset(self):
+        return Questionnaire.objects.filter(status=Questionnaire.ACTIVE).order_by("title")
+
+
+class AssessmentViewSet(viewsets.ModelViewSet):
+    permission_classes = [CanTakeAssessments]
+    pagination_class = None
+
+    def get_queryset(self):
+        qs = Assessment.objects.select_related("child", "questionnaire", "psychologist").order_by("-assessment_date", "-id")
+        role = getattr(getattr(self.request.user, "role", None), "role_name", None)
+        if role != Role.ADMINISTRATOR:
+            qs = qs.filter(psychologist=self.request.user)
+        return qs
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return AssessmentWriteSerializer
+        return AssessmentListSerializer
+
+    def perform_create(self, serializer):
+        assessment = serializer.save(psychologist=self.request.user, status="completed")
+        log_activity(self.request.user, ActivityLog.CREATED, ActivityLog.RECORD,
+                     entity_type="Assessment", entity_label=assessment.child.fullname, entity_id=assessment.id)

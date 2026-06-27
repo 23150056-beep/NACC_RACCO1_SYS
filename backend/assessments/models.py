@@ -40,9 +40,13 @@ class Assessment(models.Model):
     child = models.ForeignKey(Child, on_delete=models.CASCADE, related_name="assessments")
     psychologist = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="assessments")
+    questionnaire = models.ForeignKey(
+        Questionnaire, on_delete=models.SET_NULL, null=True, blank=True, related_name="assessments")
     assessment_date = models.DateField(auto_now_add=True)
     assessment_type = models.CharField(max_length=50, blank=True)
     status = models.CharField(max_length=50, default="ongoing")
+    notes = models.TextField(blank=True)
+    classification = models.CharField(max_length=50, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

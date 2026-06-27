@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from assessments.models import Questionnaire, Question
+from assessments.models import Questionnaire, Question, Assessment, Response
 
 
 class QuestionSerializer(serializers.ModelSerializer):
@@ -38,3 +38,35 @@ class QuestionnaireSerializer(serializers.ModelSerializer):
             instance.questions.all().delete()
             self._write_questions(instance, questions)
         return instance
+
+
+class ResponseWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Response
+        fields = ["question", "answer"]
+
+
+class AssessmentWriteSerializer(serializers.ModelSerializer):
+    responses = ResponseWriteSerializer(many=True)
+
+    class Meta:
+        model = Assessment
+        fields = ["id", "child", "questionnaire", "assessment_type", "notes", "classification", "responses"]
+
+    def create(self, validated_data):
+        responses = validated_data.pop("responses", [])
+        assessment = Assessment.objects.create(**validated_data)
+        for rd in responses:
+            Response.objects.create(assessment=assessment, **rd)
+        return assessment
+
+
+class AssessmentListSerializer(serializers.ModelSerializer):
+    child_name = serializers.CharField(source="child.fullname", read_only=True)
+    questionnaire_title = serializers.CharField(source="questionnaire.title", read_only=True, default=None)
+    psychologist_name = serializers.CharField(source="psychologist.fullname", read_only=True)
+
+    class Meta:
+        model = Assessment
+        fields = ["id", "child", "child_name", "questionnaire", "questionnaire_title",
+                  "psychologist_name", "assessment_type", "classification", "status", "assessment_date"]

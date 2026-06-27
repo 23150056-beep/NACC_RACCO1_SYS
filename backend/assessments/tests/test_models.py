@@ -39,3 +39,22 @@ class QuestionnaireFieldsTest(TestCase):
             question_type="rating_scale", options=[], order=1)
         self.assertEqual(q.order, 1)
         self.assertEqual(q.options, [])
+
+
+class AssessmentFieldsTest(TestCase):
+    def test_assessment_has_questionnaire_notes_classification(self):
+        from django.contrib.auth import get_user_model
+        from accounts.models import Role
+        from children.models import Child
+        from assessments.models import Questionnaire, Assessment
+        User = get_user_model()
+        role = Role.objects.create(role_name=Role.PSYCHOLOGIST)
+        psy = User.objects.create_user(email="p2@racco1.gov.ph", username="p2", password="x", role=role)
+        child = Child.objects.create(fullname="Ana", case_type="Foster")
+        qn = Questionnaire.objects.create(title="SDQ", status="active")
+        a = Assessment.objects.create(
+            child=child, psychologist=psy, questionnaire=qn,
+            assessment_type="Intake", notes="Calm.", classification="Normal Development")
+        self.assertEqual(a.questionnaire, qn)
+        self.assertEqual(a.notes, "Calm.")
+        self.assertEqual(a.classification, "Normal Development")
