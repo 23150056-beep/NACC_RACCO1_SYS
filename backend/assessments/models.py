@@ -4,9 +4,13 @@ from children.models import Child
 
 
 class Questionnaire(models.Model):
+    DRAFT, ACTIVE, ARCHIVED = "draft", "active", "archived"
+    STATUS_CHOICES = [(DRAFT, "Draft"), (ACTIVE, "Active"), (ARCHIVED, "Archived")]
+
     title = models.CharField(max_length=150)
     age_group = models.CharField(max_length=50, blank=True)
     description = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=DRAFT)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -22,11 +26,14 @@ class Question(models.Model):
         Questionnaire, on_delete=models.CASCADE, related_name="questions")
     question_text = models.TextField()
     question_type = models.CharField(max_length=50)
+    options = models.JSONField(default=list, blank=True)
+    order = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "tbl_question"
+        ordering = ["order", "id"]
 
 
 class Assessment(models.Model):

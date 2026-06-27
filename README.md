@@ -26,6 +26,10 @@ python manage.py seed_initial_data   # creates the 3 roles + default admin
 python manage.py runserver           # http://localhost:8000
 ```
 
+> **Optional (OCR):** digitizing *scanned/photo* instruments needs the free
+> [Tesseract OCR](https://github.com/UB-Mannheim/tesseract/wiki) binary installed
+> and on PATH. Text-based PDFs work without it; the manual builder always works.
+
 Default admin account (created by the seed command):
 - **Email:** `admin@racco1.gov.ph`
 - **Password:** `admin1234`

@@ -27,3 +27,15 @@ class AssessmentModelTest(TestCase):
             result=result, recommendation_text="Schedule follow-up", priority_level="Medium")
         self.assertEqual(rec.result.assessment.child.fullname, "Juan")
         self.assertEqual(result.classification, "Needs Monitoring")
+
+
+class QuestionnaireFieldsTest(TestCase):
+    def test_questionnaire_status_and_question_fields(self):
+        from assessments.models import Questionnaire, Question
+        qn = Questionnaire.objects.create(title="SDQ", age_group="5-8")
+        self.assertEqual(qn.status, "draft")
+        q = Question.objects.create(
+            questionnaire=qn, question_text="I am kind.",
+            question_type="rating_scale", options=[], order=1)
+        self.assertEqual(q.order, 1)
+        self.assertEqual(q.options, [])

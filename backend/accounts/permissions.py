@@ -34,3 +34,15 @@ class RecordsAccess(BasePermission):
         if request.method in SAFE_METHODS:
             return role in (Role.ADMINISTRATOR, Role.STAFF, Role.PSYCHOLOGIST)
         return role in (Role.ADMINISTRATOR, Role.STAFF)
+
+
+# Roles allowed to manage assessment instruments (questionnaires).
+# Capstone RBAC matrix = Admin-only; Psychologist added per product decision 2026-06-27.
+# TO REVERT to the capstone rule: remove Role.PSYCHOLOGIST from this tuple.
+INSTRUMENT_MANAGER_ROLES = (Role.ADMINISTRATOR, Role.PSYCHOLOGIST)
+
+
+class CanManageInstruments(BasePermission):
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated
+                    and _role_name(request) in INSTRUMENT_MANAGER_ROLES)
