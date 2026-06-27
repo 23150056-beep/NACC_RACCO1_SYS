@@ -40,7 +40,7 @@ export default function Login() {
           </div>
           <div style={{ position: 'relative' }}>
             <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 30, lineHeight: 1.1 }}>
-              Hope and a Home<br />for Every Child
+              In The Best Interests<br />of the Child
             </div>
             <p style={{ marginTop: 12, fontSize: 14, opacity: 0.85, lineHeight: 1.6, maxWidth: 320 }}>
               Behavioral Assessment &amp; Counseling Support System for the National Authority for Child Care.
