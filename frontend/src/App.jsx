@@ -1,6 +1,8 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { ActivityProvider } from './context/ActivityContext';
+import { INSTRUMENT_MANAGER_ROLES } from './config/roles';
 import ProtectedRoute from './components/ProtectedRoute';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
@@ -12,14 +14,15 @@ import Report from './pages/Report';
 import Compliance from './pages/Compliance';
 import Settings from './pages/Settings';
 import Users from './pages/Users';
+import Questionnaires from './pages/Questionnaires';
 
 function Shell({ children }) {
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden font-sans">
+    <div style={{ display: 'flex', height: '100%', background: 'var(--bg-app)', overflow: 'hidden' }}>
       <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <Topbar />
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        <main className="racco-scroll" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>{children}</main>
       </div>
     </div>
   );
@@ -28,18 +31,21 @@ function Shell({ children }) {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
+      <ActivityProvider>
+        <BrowserRouter>
+          <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<ProtectedRoute><Shell><Dashboard /></Shell></ProtectedRoute>} />
-          <Route path="/children" element={<ProtectedRoute roles={['Administrator', 'Staff', 'Counselor']}><Shell><Children /></Shell></ProtectedRoute>} />
-          <Route path="/assessment" element={<ProtectedRoute roles={['Administrator', 'Counselor']}><Shell><Assessment /></Shell></ProtectedRoute>} />
+          <Route path="/children" element={<ProtectedRoute roles={['Administrator', 'Staff', 'Psychologist']}><Shell><Children /></Shell></ProtectedRoute>} />
+          <Route path="/assessment" element={<ProtectedRoute roles={['Psychologist']}><Shell><Assessment /></Shell></ProtectedRoute>} />
+          <Route path="/questionnaires" element={<ProtectedRoute roles={INSTRUMENT_MANAGER_ROLES}><Shell><Questionnaires /></Shell></ProtectedRoute>} />
           <Route path="/report" element={<ProtectedRoute><Shell><Report /></Shell></ProtectedRoute>} />
           <Route path="/compliance" element={<ProtectedRoute><Shell><Compliance /></Shell></ProtectedRoute>} />
           <Route path="/users" element={<ProtectedRoute roles={['Administrator']}><Shell><Users /></Shell></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute><Shell><Settings /></Shell></ProtectedRoute>} />
-        </Routes>
-      </BrowserRouter>
+          <Route path="/settings" element={<ProtectedRoute roles={['Administrator']}><Shell><Settings /></Shell></ProtectedRoute>} />
+          </Routes>
+        </BrowserRouter>
+      </ActivityProvider>
     </AuthProvider>
   );
 }

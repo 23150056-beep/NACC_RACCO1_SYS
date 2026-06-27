@@ -1,49 +1,83 @@
 import React from 'react';
-import { summaryMetrics, caseTrends, mockActivityFeed } from '../data/mockData';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import MetricCard from '../components/MetricCard';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { Card, StatCard, Button, Icon, ROLE_META, PAGE } from '../ui';
+import { metrics, trend } from '../data/seedData';
+import { useActivity } from '../context/ActivityContext';
+import { eventText, timeAgo } from '../components/Topbar';
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const role = user?.role_name || 'Staff';
+  const m = ROLE_META[role] || ROLE_META.Staff;
+  const max = Math.max(...trend.map((t) => t.v));
+  const { events } = useActivity();
+  const feed = events.slice(0, 6);
+
+  const actions = [
+    { label: 'Children Records', icon: 'folder-heart', variant: 'secondary', to: '/children', roles: ['Administrator', 'Psychologist', 'Staff'] },
+    { label: 'New Assessment', icon: 'clipboard-list', variant: 'primary', to: '/assessment', roles: ['Psychologist'] },
+    { label: 'Assessment Results', icon: 'clipboard-check', variant: 'primary', to: '/report', roles: ['Administrator'] },
+    { label: 'View Results', icon: 'heart-pulse', variant: 'primary', to: '/report', roles: ['Staff'] },
+  ].filter((a) => a.roles.includes(role));
+
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Dashboard</h1>
-      
-      {/* Metrics Row */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <MetricCard title="Needing Counseling" value={summaryMetrics.needingCounseling} color="text-red-500" />
-        <MetricCard title="Ongoing Cases" value={summaryMetrics.ongoing} color="text-yellow-500" />
-        <MetricCard title="Completed" value={summaryMetrics.completed} color="text-green-500" />
-        <MetricCard title="Total Children" value={summaryMetrics.total} color="text-brand-600" />
+    <div style={PAGE}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 16, marginBottom: 20 }}>
+        <StatCard label="Needing Counseling" value={metrics.needing} tone="red" icon={<Icon name="heart-pulse" size={18} />} trend="2 new" trendDir="up" />
+        <StatCard label="Ongoing Counseling" value={metrics.ongoing} tone="amber" icon={<Icon name="loader" size={18} />} />
+        <StatCard label="Completed Counseling" value={metrics.completed} tone="success" icon={<Icon name="check-circle-2" size={18} />} />
+        <StatCard label="Total Children" value={metrics.total} tone="brand" icon={<Icon name="users" size={18} />} hint="Active records" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Chart */}
-        <div className="lg:col-span-2 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-          <h2 className="text-lg font-semibold mb-4 text-gray-700">Monthly Session Trend</h2>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={caseTrends}>
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="count" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Activity Feed */}
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-          <h2 className="text-lg font-semibold mb-4 text-gray-700">Live Activity Feed</h2>
-          <div className="space-y-4">
-            {mockActivityFeed.map(feed => (
-              <div key={feed.id} className="border-b last:border-0 pb-3">
-                <p className="text-sm font-medium text-gray-800">{feed.text}</p>
-                <p className="text-xs text-gray-400 mt-1">{feed.time}</p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr)', gap: 20 }}>
+        <Card eyebrow="Last 6 months" title="Monthly Session Trend" padding="22px">
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 18, height: 200, paddingTop: 12 }}>
+            {trend.map((t) => (
+              <div key={t.m} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, height: '100%', justifyContent: 'flex-end' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>{t.v}</div>
+                <div style={{ width: '100%', maxWidth: 46, height: `${(t.v / max) * 100}%`, background: 'linear-gradient(180deg, var(--blue-500), var(--blue-600))', borderRadius: '6px 6px 0 0', transition: 'height var(--dur-slow) var(--ease-out)' }} />
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-body)' }}>{t.m}</div>
               </div>
             ))}
           </div>
-        </div>
+        </Card>
+
+        <Card eyebrow="Live" title="Activity Feed" padding="20px">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {feed.length === 0 ? (
+              <div style={{ fontSize: 13, color: 'var(--text-faint)', padding: '8px 0' }}>No recent activity.</div>
+            ) : feed.map((a, i) => (
+              <div key={a.id ?? i} style={{ display: 'flex', gap: 11, padding: '11px 0', borderBottom: i < feed.length - 1 ? '1px solid var(--ink-100)' : 'none' }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', marginTop: 5, flex: 'none', background: a.action === 'archived' ? 'var(--red-500)' : a.action === 'created' ? 'var(--success-500)' : a.action === 'login' ? 'var(--amber-500)' : 'var(--blue-500)' }} />
+                <div>
+                  <div style={{ fontSize: 13, color: 'var(--text-strong)', fontWeight: 600, lineHeight: 1.4 }}>{eventText(a)}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-faint)', marginTop: 2 }}>{a.actor_label} · {timeAgo(a.created_at)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      <div style={{ marginTop: 20 }}>
+        <Card padding="20px" accent={m.color}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <span style={{ width: 44, height: 44, borderRadius: 'var(--radius-lg)', background: m.soft, color: m.color, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}><Icon name="sparkles" size={22} /></span>
+              <div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, color: 'var(--text-strong)' }}>Quick actions for {role}s</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Jump straight to what your role handles most.</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {actions.map((a) => (
+                <Button key={a.label} variant={a.variant} onClick={() => navigate(a.to)} iconLeft={<Icon name={a.icon} size={17} />}>{a.label}</Button>
+              ))}
+            </div>
+          </div>
+        </Card>
       </div>
     </div>
   );

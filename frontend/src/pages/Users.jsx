@@ -1,17 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
 import api from '../api/client';
+import { useActivity } from '../context/ActivityContext';
+import { Card, Button, Alert, Input, Select, FormField, Avatar, RoleBadge, EmptyState, Icon, iconBtn, PAGE } from '../ui';
 
 const EMPTY = { email: '', username: '', first_name: '', last_name: '', middle_initial: '', contact_details: '', role: '', password: '' };
 
 export default function Users() {
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
-  const [form, setForm] = useState(null); // null = closed, object = open
+  const [form, setForm] = useState(null);
   const [error, setError] = useState('');
+  const { refresh: refreshActivity } = useActivity();
 
   const load = () => api.get('/users/').then((r) => setUsers(r.data));
-
   useEffect(() => {
     load();
     api.get('/roles/').then((r) => setRoles(r.data));
@@ -25,88 +26,98 @@ export default function Users() {
     setError('');
     try {
       const payload = { ...form };
+      delete payload.role_name; delete payload.fullname;
       if (!payload.password) delete payload.password;
       if (form.id) await api.put(`/users/${form.id}/`, payload);
       else await api.post('/users/', payload);
       setForm(null);
       load();
+      refreshActivity();
     } catch (err) {
       setError(JSON.stringify(err.response?.data || 'Save failed'));
     }
   };
 
   const archive = async (u) => {
-    if (!window.confirm(`Archive ${u.fullname || u.email}?`)) return;
+    if (!window.confirm(`Deactivate ${u.fullname || u.email}?`)) return;
     await api.post(`/users/${u.id}/archive/`);
     load();
+    refreshActivity();
   };
 
+  const toneFor = (role) => (role === 'Administrator' ? 'brand' : role === 'Psychologist' ? 'red' : 'amber');
+
   return (
-    <div className="p-6 relative">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">User Management</h1>
-        <button onClick={openCreate} className="bg-brand-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-brand-700 transition">+ Add User</button>
+    <div style={{ ...PAGE, position: 'relative' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+        <Button variant="primary" onClick={openCreate} iconLeft={<Icon name="user-plus" size={17} />}>Add User</Button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="bg-gray-50 border-b">
-              <th className="p-3 text-sm font-semibold text-gray-600">Name</th>
-              <th className="p-3 text-sm font-semibold text-gray-600">Email</th>
-              <th className="p-3 text-sm font-semibold text-gray-600">Role</th>
-              <th className="p-3 text-sm font-semibold text-gray-600">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u) => (
-              <tr key={u.id} className="border-b hover:bg-gray-50">
-                <td className="p-3 text-sm font-medium text-gray-800">{u.fullname || u.username}</td>
-                <td className="p-3 text-sm text-gray-600">{u.email}</td>
-                <td className="p-3 text-sm text-gray-600">{u.role_name}</td>
-                <td className="p-3 text-sm space-x-3">
-                  <button onClick={() => openEdit(u)} className="text-brand-600 hover:underline">Edit</button>
-                  <button onClick={() => archive(u)} className="text-red-600 hover:underline">Archive</button>
-                </td>
-              </tr>
-            ))}
-            {users.length === 0 && <tr><td colSpan="4" className="p-6 text-center text-gray-500">No users.</td></tr>}
-          </tbody>
-        </table>
-      </div>
+      <Card padding="0">
+        {users.length === 0 ? (
+          <EmptyState icon={<Icon name="users" size={24} />} title="No users yet" description="Add agency accounts to get started." />
+        ) : (
+          <div className="racco-scroll" style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', minWidth: 680, borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: 'var(--ink-50)', borderBottom: '1px solid var(--border)' }}>
+                  {['Name', 'Email', 'Contact', 'Role', 'Actions'].map((h) => (
+                    <th key={h} scope="col" style={{ textAlign: 'left', padding: '12px 16px', fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <tr key={u.id} style={{ borderBottom: '1px solid var(--ink-100)' }}>
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                        <Avatar name={u.fullname || u.username || u.email} tone={toneFor(u.role_name)} size="sm" />
+                        <span style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text-strong)' }}>{u.fullname || u.username}</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-body)' }} className="racco-mono">{u.email}</td>
+                    <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-muted)' }} className="racco-mono">{u.contact_details || '—'}</td>
+                    <td style={{ padding: '12px 16px' }}>{u.role_name ? <RoleBadge role={u.role_name} /> : '—'}</td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button title="Edit user" aria-label={`Edit ${u.fullname || u.email}`} onClick={() => openEdit(u)} style={iconBtn('var(--blue-600)')}><Icon name="pencil" size={15} /></button>
+                        <button title="Deactivate user" aria-label={`Deactivate ${u.fullname || u.email}`} onClick={() => archive(u)} style={iconBtn('var(--red-500)')}><Icon name="user-x" size={15} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
 
       {form && (
-        <div className="fixed inset-0 bg-black/30 flex justify-end z-50">
-          <form onSubmit={save} className="w-96 bg-white h-full shadow-2xl border-l flex flex-col">
-            <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-              <h2 className="text-lg font-bold text-gray-800">{form.id ? 'Edit User' : 'Add User'}</h2>
-              <button type="button" onClick={() => setForm(null)} className="p-1 hover:bg-gray-200 rounded-full text-gray-500"><X size={20} /></button>
+        <div onClick={() => setForm(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(14,19,29,0.32)', display: 'flex', justifyContent: 'flex-end', zIndex: 70, animation: 'racco-fade-in var(--dur-base) var(--ease-out)' }}>
+          <form onSubmit={save} onClick={(e) => e.stopPropagation()} style={{ width: 420, maxWidth: '92%', height: '100%', background: 'var(--surface)', boxShadow: 'var(--shadow-xl)', display: 'flex', flexDirection: 'column', animation: 'racco-slide-left var(--dur-slow) var(--ease-out)' }}>
+            <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--ink-50)' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 17, color: 'var(--text-strong)' }}>{form.id ? 'Edit User' : 'Add User'}</div>
+              <button type="button" onClick={() => setForm(null)} aria-label="Close" style={iconBtn('var(--text-muted)')}><Icon name="x" size={17} /></button>
             </div>
-            <div className="p-6 flex-1 overflow-y-auto space-y-3">
-              {error && <div className="text-xs text-red-600 bg-red-50 border border-red-200 p-2 rounded break-words">{error}</div>}
+            <div className="racco-scroll" style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {error && <Alert tone="danger" icon={<Icon name="alert-triangle" size={18} />}>{error}</Alert>}
               {[['first_name', 'First Name'], ['middle_initial', 'Middle Initial'], ['last_name', 'Last Name'], ['username', 'Username'], ['email', 'Email'], ['contact_details', 'Contact Details']].map(([k, label]) => (
-                <div key={k}>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-                  <input value={form[k] || ''} onChange={(e) => setForm({ ...form, [k]: e.target.value })}
-                    className="w-full border p-2 rounded-md focus:ring-2 focus:ring-brand-500 outline-none" />
-                </div>
+                <FormField key={k} label={label}>
+                  <Input value={form[k] || ''} onChange={(e) => setForm({ ...form, [k]: e.target.value })} type={k === 'email' ? 'email' : 'text'} />
+                </FormField>
               ))}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                <select value={form.role || ''} onChange={(e) => setForm({ ...form, role: e.target.value })}
-                  className="w-full border p-2 rounded-md focus:ring-2 focus:ring-brand-500 outline-none">
-                  <option value="">-- Select role --</option>
+              <FormField label="Role">
+                <Select value={form.role || ''} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+                  <option value="">— Select role —</option>
                   {roles.map((r) => <option key={r.id} value={r.id}>{r.role_name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Password {form.id && <span className="text-gray-400">(leave blank to keep)</span>}</label>
-                <input type="password" value={form.password || ''} onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  className="w-full border p-2 rounded-md focus:ring-2 focus:ring-brand-500 outline-none" />
-              </div>
+                </Select>
+              </FormField>
+              <FormField label={form.id ? 'Password (leave blank to keep)' : 'Password'}>
+                <Input type="password" value={form.password || ''} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+              </FormField>
             </div>
-            <div className="p-4 border-t bg-gray-50">
-              <button type="submit" className="w-full bg-brand-600 text-white py-2 rounded-lg font-medium hover:bg-brand-700 transition">Save</button>
+            <div style={{ padding: 16, borderTop: '1px solid var(--border)' }}>
+              <Button type="submit" variant="primary" fullWidth iconLeft={<Icon name="save" size={16} />}>Save User</Button>
             </div>
           </form>
         </div>

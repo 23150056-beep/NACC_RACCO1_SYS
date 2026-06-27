@@ -1,51 +1,107 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, ClipboardList, FileText, CheckSquare, Settings, UserCog } from 'lucide-react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { Avatar, RoleBadge, Icon, ROLE_META } from '../ui';
+import { INSTRUMENT_MANAGER_ROLES } from '../config/roles';
+
+// Role-gated navigation. Sections render only when they contain a visible item.
+const NAV = [
+  { section: 'Overview' },
+  { to: '/', label: 'Dashboard', icon: 'layout-dashboard', roles: ['Administrator', 'Psychologist', 'Staff'], end: true },
+  { section: 'Casework' },
+  { to: '/children', label: 'Children Records', icon: 'users', roles: ['Administrator', 'Psychologist', 'Staff'] },
+  { section: 'Clinical' },
+  { to: '/assessment', label: 'Assessment Tools', icon: 'clipboard-list', roles: ['Psychologist'] },
+  { to: '/questionnaires', label: 'Assessment Instruments', icon: 'clipboard-pen', roles: INSTRUMENT_MANAGER_ROLES },
+  { to: '/report', label: 'Assessment Results', icon: 'clipboard-check', roles: ['Administrator', 'Psychologist'] },
+  { to: '/report', label: 'Assessment Results', icon: 'heart-pulse', roles: ['Staff'], readonly: true },
+  { section: 'Governance' },
+  { to: '/compliance', label: 'Compliance & Audit', icon: 'shield-check', roles: ['Administrator', 'Psychologist', 'Staff'] },
+  { to: '/users', label: 'User Management', icon: 'user-cog', roles: ['Administrator'] },
+  { to: '/settings', label: 'Settings', icon: 'settings', roles: ['Administrator'] },
+];
+
+function navForRole(role) {
+  const out = [];
+  let pending = null;
+  for (const item of NAV) {
+    if (item.section) { pending = item.section; continue; }
+    if (!item.roles.includes(role)) continue;
+    if (pending) { out.push({ section: pending }); pending = null; }
+    out.push(item);
+  }
+  return out;
+}
 
 export default function Sidebar() {
-  const { user } = useAuth();
-  const role = user?.role_name;
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const role = user?.role_name || 'Staff';
+  const m = ROLE_META[role] || ROLE_META.Staff;
+  const items = navForRole(role);
+  const name = user?.fullname || user?.username || 'User';
 
-  const links = [
-    { to: '/', icon: <LayoutDashboard size={20} />, label: 'Dashboard', roles: null },
-    { to: '/children', icon: <Users size={20} />, label: 'Children Records', roles: ['Administrator', 'Staff', 'Counselor'] },
-    { to: '/assessment', icon: <ClipboardList size={20} />, label: 'Assessment', roles: ['Administrator', 'Counselor'] },
-    { to: '/report', icon: <FileText size={20} />, label: 'Counselor Report', roles: null },
-    { to: '/compliance', icon: <CheckSquare size={20} />, label: 'Compliance', roles: null },
-    { to: '/users', icon: <UserCog size={20} />, label: 'User Management', roles: ['Administrator'] },
-    { to: '/settings', icon: <Settings size={20} />, label: 'Settings', roles: null },
-  ].filter((l) => !l.roles || l.roles.includes(role));
+  const handleLogout = () => { logout(); navigate('/login'); };
 
   return (
-    <div className="w-64 bg-white border-r h-screen overflow-y-auto flex flex-col">
-      <div className="p-6 border-b">
-        <h1 className="text-xl font-bold text-brand-700">NACC CWMS</h1>
-        <p className="text-xs text-gray-500 mt-1">Child Welfare Mgmt</p>
-      </div>
-      <nav className="flex-1 p-4 space-y-2">
-        {links.map((link) => (
-          <NavLink key={link.to} to={link.to} end={link.to === '/'}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                isActive ? 'bg-brand-50 text-brand-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              }`}>
-            {link.icon}
-            {link.label}
-          </NavLink>
-        ))}
-      </nav>
-      <div className="p-4 border-t">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold">
-            {(user?.first_name?.[0] || 'U')}{(user?.last_name?.[0] || '')}
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-800">{user?.fullname || user?.username}</p>
-            <p className="text-xs text-gray-500">{role || '—'}</p>
-          </div>
+    <aside style={{ width: 'var(--sidebar-w)', background: 'var(--surface)', borderRight: '1px solid var(--border)', height: '100%', display: 'flex', flexDirection: 'column', flex: 'none' }}>
+      <div style={{ padding: '18px 18px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 11 }}>
+        <img src="/racco-seal.jpg" alt="" style={{ width: 42, height: 42, borderRadius: '50%', objectFit: 'cover', boxShadow: 'var(--shadow-xs)' }} />
+        <div style={{ lineHeight: 1.1 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 19, color: 'var(--blue-700)' }}>RACCO I</div>
+          <div style={{ fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase' }}>Child Care Office</div>
         </div>
       </div>
-    </div>
+
+      <nav className="racco-scroll" aria-label="Primary" style={{ flex: 1, overflowY: 'auto', padding: '8px 12px' }}>
+        {items.map((it, i) =>
+          it.section ? (
+            <div key={'s' + i} className="racco-eyebrow" style={{ fontSize: 10, padding: '12px 10px 5px' }}>{it.section}</div>
+          ) : (
+            <NavLink
+              key={it.label + it.to}
+              to={it.to}
+              end={it.end}
+              title={it.readonly ? it.label + ' (read-only)' : it.label}
+              style={({ isActive }) => ({
+                width: '100%', display: 'flex', alignItems: 'center', gap: 11, padding: '8px 11px', marginBottom: 2,
+                borderRadius: 'var(--radius-md)', cursor: 'pointer', textAlign: 'left', textDecoration: 'none',
+                background: isActive ? m.soft : 'transparent', color: isActive ? m.color : 'var(--text-body)',
+                fontFamily: 'var(--font-sans)', fontWeight: isActive ? 700 : 600, fontSize: 14,
+                position: 'relative', transition: 'var(--transition-base)',
+              })}
+              onMouseEnter={(e) => { if (!e.currentTarget.style.background.includes('var')) e.currentTarget.style.background = 'var(--ink-50)'; }}
+            >
+              {({ isActive }) => (
+                <>
+                  {isActive && <span style={{ position: 'absolute', left: -12, top: 6, bottom: 6, width: 3, borderRadius: '0 3px 3px 0', background: m.color }} />}
+                  <Icon name={it.icon} size={18} />
+                  <span style={{ flex: 1 }}>{it.label}</span>
+                  {it.readonly && <Icon name="eye" size={14} style={{ opacity: 0.6 }} />}
+                </>
+              )}
+            </NavLink>
+          )
+        )}
+      </nav>
+
+      <div style={{ padding: 12, borderTop: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 6px' }}>
+          <Avatar name={name} tone={m.tone} size="md" />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
+            <div style={{ marginTop: 2 }}><RoleBadge role={role} size="sm" /></div>
+          </div>
+          <button
+            onClick={handleLogout} title="Sign out" aria-label="Sign out"
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', padding: 6, borderRadius: 'var(--radius-sm)', display: 'inline-flex' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--red-500)'; e.currentTarget.style.background = 'var(--red-50)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-faint)'; e.currentTarget.style.background = 'transparent'; }}
+          >
+            <Icon name="log-out" size={17} />
+          </button>
+        </div>
+      </div>
+    </aside>
   );
 }

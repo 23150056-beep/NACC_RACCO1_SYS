@@ -1,108 +1,144 @@
-import React, { useState } from 'react';
-import { CheckCircle } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import api from '../api/client';
+import { useAuth } from '../context/AuthContext';
+import { Card, Badge, Alert, Input, SeverityBadge, EmptyState, Icon, iconBtn, PAGE } from '../ui';
+import { resultMeta, statusToResult } from '../data/seedData';
+
+// Same placeholder severity derivation used by Children, kept until assessment
+// outcomes are persisted on the backend.
+function deriveSeverity(id) { return ['standard', 'moderate', 'high'][(Number(id) * 7) % 3]; }
+function caseRef(id) { return `C-${String(id).padStart(4, '0')}`; }
 
 export default function Report() {
-  const [submitted, setSubmitted] = useState(false);
-  const [formData, setFormData] = useState({
-    agreement: '',
-    classification: 'Trauma',
-    notes: ''
-  });
+  const { user } = useAuth();
+  const role = user?.role_name || 'Staff';
+  const staff = role === 'Staff';
+  const [children, setChildren] = useState([]);
+  const [q, setQ] = useState('');
+  const [sel, setSel] = useState(null);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 4000);
-  };
+  useEffect(() => { api.get('/children/').then((r) => setChildren(r.data)).catch(() => {}); }, []);
+
+  const rows = useMemo(() => children.map((c, i) => {
+    const r = statusToResult(deriveSeverity(c.id));
+    const meta = resultMeta[i % resultMeta.length];
+    return { id: c.id, name: c.fullname, ref: caseRef(c.id), caseType: c.case_type || '—', ...r, ...meta };
+  }), [children]);
+
+  const visible = rows.filter((r) => r.name.toLowerCase().includes(q.toLowerCase()) || r.ref.toLowerCase().includes(q.toLowerCase()));
+  const td = { padding: '12px 16px', fontSize: 13, color: 'var(--text-body)', whiteSpace: 'nowrap' };
 
   return (
-    <div className="p-6 relative">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Counselor Report</h1>
-      
-      {submitted && (
-        <div className="absolute top-6 right-6 bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-right">
-          <CheckCircle size={20} />
-          <span className="font-medium">Report submitted securely to NACC.</span>
+    <div style={{ ...PAGE, position: 'relative' }}>
+      {staff ? (
+        <Alert tone="info" icon={<Icon name="eye" size={18} />} style={{ marginBottom: 18 }} title="Read-only view">
+          As Staff, you can view counseling outcomes for case coordination, but the assessment tools and raw questionnaire responses are restricted to psychologists.
+        </Alert>
+      ) : (
+        <Alert tone="info" icon={<Icon name="users" size={18} />} style={{ marginBottom: 16 }} title="Shared results">
+          Every child's assessment outcome is visible to all psychologist accounts for continuity of care. This view is read-only — run or update an assessment from <strong>Assessment Tools</strong>.
+        </Alert>
+      )}
+
+      {!staff && (
+        <div style={{ width: 340, maxWidth: '100%', marginBottom: 14 }}>
+          <Input placeholder="Search results by child name or case ID…" value={q} onChange={(e) => setQ(e.target.value)} leading={<Icon name="search" size={16} />} />
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* AI Recommendation */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col h-full">
-          <h2 className="text-lg font-semibold mb-4 text-gray-700">AI Analysis Reference</h2>
-          
-          <div className="bg-brand-50 p-5 rounded-lg mb-6 border border-brand-100 flex-1">
-            <div className="flex items-center justify-between mb-3 border-b border-brand-200 pb-3">
-              <h3 className="font-bold text-brand-800 text-lg">High Trauma Indicator</h3>
-              <span className="bg-white text-brand-700 px-3 py-1 rounded-full text-xs font-bold border border-brand-200">
-                Confidence: 89%
-              </span>
-            </div>
-            <p className="text-gray-700 text-sm leading-relaxed mb-4">
-              Based on the questionnaire responses, there are strong indications of unresolved trauma requiring immediate clinical attention. The child showed strong distress signals particularly regarding emotional regulation and sleep disruption.
-            </p>
+      <Card padding="0">
+        {visible.length === 0 ? (
+          <EmptyState icon={<Icon name="folder-search" size={24} />} title="No results found" description="Try a different name or case ID." />
+        ) : (
+          <div className="racco-scroll" style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', minWidth: 760, borderCollapse: 'collapse', fontFamily: 'var(--font-sans)' }}>
+              <thead>
+                <tr style={{ background: 'var(--ink-50)', borderBottom: '1px solid var(--border)' }}>
+                  {['Child', 'Case Type', 'Outcome', 'Confidence', 'Psychologist', 'Last Session', staff ? null : ''].filter((h) => h !== null).map((h, i) => (
+                    <th key={i} scope="col" style={{ textAlign: 'left', padding: '12px 16px', fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((r) => {
+                  const clickable = !staff;
+                  return (
+                    <tr key={r.id} tabIndex={clickable ? 0 : undefined} role={clickable ? 'button' : undefined} aria-label={clickable ? `View ${r.name}'s assessment result` : undefined}
+                      onClick={clickable ? () => setSel(r) : undefined}
+                      onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSel(r); } } : undefined}
+                      style={{ borderBottom: '1px solid var(--ink-100)', cursor: clickable ? 'pointer' : 'default', transition: 'background var(--dur-fast) var(--ease-out)' }}
+                      onMouseEnter={clickable ? (e) => (e.currentTarget.style.background = 'var(--blue-50)') : undefined}
+                      onMouseLeave={clickable ? (e) => (e.currentTarget.style.background = 'transparent') : undefined}>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ fontWeight: 700, fontSize: 13.5, color: staff ? 'var(--text-strong)' : 'var(--blue-700)', whiteSpace: 'nowrap' }}>{r.name}</div>
+                        <div className="racco-mono" style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.ref}</div>
+                      </td>
+                      <td style={td}>{r.caseType}</td>
+                      <td style={{ padding: '12px 16px' }}><SeverityBadge level={r.level} size="sm" /></td>
+                      <td style={{ padding: '12px 16px' }}><span className="racco-mono" style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-strong)' }}>{r.conf}%</span></td>
+                      <td style={td}>{r.psychologist}</td>
+                      <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{r.date}</td>
+                      {!staff && <td style={{ padding: '12px 16px', textAlign: 'right' }}><Icon name="chevron-right" size={16} style={{ color: 'var(--text-faint)' }} /></td>}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-          
-          <div className="bg-gray-50 p-4 rounded-lg border mt-auto">
-            <label className="block text-sm font-semibold text-gray-800 mb-3">Do you agree with the AI Classification?</label>
-            <div className="flex gap-6">
-              {['Agree', 'Partially Agree', 'Disagree'].map(opt => (
-                <label key={opt} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-100 p-2 rounded flex-1">
-                  <input 
-                    type="radio" 
-                    name="agree" 
-                    value={opt}
-                    checked={formData.agreement === opt}
-                    onChange={e => setFormData({...formData, agreement: e.target.value})}
-                    className="w-4 h-4 text-brand-600 focus:ring-brand-500"
-                  /> 
-                  <span className="font-medium">{opt}</span>
-                </label>
-              ))}
-            </div>
+        )}
+      </Card>
+
+      {sel && <ResultDrawer row={sel} onClose={() => setSel(null)} />}
+    </div>
+  );
+}
+
+function ResultDrawer({ row, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  const soft = row.tone === 'danger' ? 'var(--red-50)' : row.tone === 'warning' ? 'var(--warning-50)' : 'var(--success-50)';
+  const line = row.tone === 'danger' ? 'var(--red-100)' : row.tone === 'warning' ? 'var(--warning-100)' : 'var(--success-100)';
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(14,19,29,0.32)', display: 'flex', justifyContent: 'flex-end', zIndex: 60, animation: 'racco-fade-in var(--dur-base) var(--ease-out)' }}>
+      <div role="dialog" aria-modal="true" aria-label={`Assessment result for ${row.name}`} onClick={(e) => e.stopPropagation()} style={{ width: 440, maxWidth: '92%', height: '100%', background: 'var(--surface)', boxShadow: 'var(--shadow-xl)', display: 'flex', flexDirection: 'column', animation: 'racco-slide-left var(--dur-slow) var(--ease-out)' }}>
+        <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--ink-50)' }}>
+          <div>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 17, color: 'var(--text-strong)' }}>{row.name}</div>
+            <div className="racco-mono" style={{ fontSize: 12, color: 'var(--text-muted)' }}>{row.ref} · {row.caseType}</div>
           </div>
+          <button onClick={onClose} aria-label="Close panel" title="Close" style={iconBtn('var(--text-muted)', 32)}><Icon name="x" size={17} /></button>
         </div>
 
-        {/* Clinical Form */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h2 className="text-lg font-semibold mb-4 text-gray-700">Official Clinical Notes</h2>
-          
-          <form className="space-y-5" onSubmit={handleSubmit}>
-            <div>
-              <label className="block text-sm font-semibold text-gray-800 mb-2">Final Practitioner Classification</label>
-              <select 
-                className="w-full border-gray-300 border p-3 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
-                value={formData.classification}
-                onChange={e => setFormData({...formData, classification: e.target.value})}
-              >
-                <option>Trauma / Stressor-related</option>
-                <option>Behavioral / Conduct</option>
-                <option>Adjustment Disorder</option>
-                <option>Normal Development</option>
-              </select>
+        <div className="racco-scroll" style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <div>
+            <div className="racco-eyebrow" style={{ fontSize: 10, marginBottom: 8 }}>AI Sentiment Analysis</div>
+            <div style={{ background: soft, border: `1px solid ${line}`, borderRadius: 'var(--radius-lg)', padding: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+                <SeverityBadge level={row.level}>{row.label}</SeverityBadge>
+                <Badge tone="brand" solid>{row.conf}% confidence</Badge>
+              </div>
+              <p style={{ fontSize: 13.5, color: 'var(--text-body)', lineHeight: 1.6, margin: 0 }}>{row.text}</p>
             </div>
-            
-            <div>
-              <label className="block text-sm font-semibold text-gray-800 mb-2">Detailed Counselor's Assessment</label>
-              <textarea 
-                rows="8" 
-                required
-                value={formData.notes}
-                onChange={e => setFormData({...formData, notes: e.target.value})}
-                className="w-full border-gray-300 border p-3 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none resize-none" 
-                placeholder="Enter clinical observations, behavioral patterns, and recommended interventions... (Required for submission)"
-              ></textarea>
-            </div>
+          </div>
 
-            <button 
-              type="submit"
-              disabled={!formData.agreement || !formData.notes}
-              className="w-full bg-brand-600 text-white p-3 rounded-lg font-bold hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition"
-            >
-              Sign and Submit to NACC
-            </button>
-            {!formData.agreement && <p className="text-xs text-red-500 text-center">Please indicate AI agreement on the left.</p>}
-          </form>
+          <div>
+            <div className="racco-eyebrow" style={{ fontSize: 10, marginBottom: 8 }}>Psychologist's Clinical Notes</div>
+            <div style={{ background: 'var(--ink-50)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, paddingBottom: 12, marginBottom: 12, borderBottom: '1px solid var(--border)' }}>
+                <div><div style={{ fontSize: 11, color: 'var(--text-faint)' }}>Final classification</div><div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text-strong)' }}>{row.cls}</div></div>
+                <div style={{ textAlign: 'right' }}><div style={{ fontSize: 11, color: 'var(--text-faint)' }}>Signed by</div><div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text-strong)' }}>{row.psychologist}</div></div>
+              </div>
+              <p style={{ fontSize: 13.5, color: 'var(--text-body)', lineHeight: 1.6, margin: 0 }}>{row.note}</p>
+            </div>
+          </div>
+
+          <Alert disclaimer title="Read-only record:">This is the signed assessment on file with NACC. To revise it, run a new session from Assessment Tools.</Alert>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-faint)' }}>
+            <Icon name="calendar" size={14} /> Last session {row.date}
+          </div>
         </div>
       </div>
     </div>
