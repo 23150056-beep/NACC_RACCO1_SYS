@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../api/client';
 import { useActivity } from '../context/ActivityContext';
 import { Card, Button, Alert, Select, FormField, ProgressSteps, Icon, PAGE } from '../ui';
+import RespondentSurvey from '../components/RespondentSurvey';
 
 function caseRef(id) { return `C-${String(id).padStart(4, '0')}`; }
 
@@ -20,6 +21,8 @@ export default function Assessment() {
   const [notes, setNotes] = useState('');
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+  const [kiosk, setKiosk] = useState(false);
+  const [respondentMode, setRespondentMode] = useState('staff');
 
   useEffect(() => {
     api.get('/children/').then((r) => setChildren(r.data)).catch(() => {});
@@ -43,12 +46,13 @@ export default function Assessment() {
         assessment_type: stype,
         classification: cls,
         notes,
+        respondent_mode: respondentMode,
         responses: questions.map((q) => ({ question: q.id, answer: String(answers[q.id]) })),
       });
       setSent(true);
       refreshActivity();
       setTimeout(() => {
-        setSent(false); setStep(1); setChild(''); setFormId(''); setAnswers({}); setNotes('');
+        setSent(false); setStep(1); setChild(''); setFormId(''); setAnswers({}); setNotes(''); setRespondentMode('staff');
       }, 2600);
     } catch (err) {
       setError(JSON.stringify(err.response?.data || 'Submit failed'));
@@ -110,8 +114,13 @@ export default function Assessment() {
 
           {step === 3 && (
             <div>
-              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 700, marginBottom: 4 }}>{form?.title || 'Questionnaire'}</h2>
-              <p style={{ fontSize: 13.5, color: 'var(--text-muted)', marginBottom: 18 }}>Answer each item based on the session.</p>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 18 }}>
+                <div>
+                  <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 700, marginBottom: 4 }}>{form?.title || 'Questionnaire'}</h2>
+                  <p style={{ fontSize: 13.5, color: 'var(--text-muted)' }}>Answer each item based on the session, or hand the device to the child.</p>
+                </div>
+                <Button variant="secondary" onClick={() => setKiosk(true)} iconLeft={<Icon name="smile" size={17} />}>Hand to child</Button>
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {questions.map((q, i) => (
                   <div key={q.id} style={{ background: 'var(--ink-50)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '14px 16px' }}>
@@ -163,6 +172,15 @@ export default function Assessment() {
           </div>
         </Card>
       </div>
+      {kiosk && (
+        <RespondentSurvey
+          questions={questions}
+          childName={childObj?.fullname}
+          initial={answers}
+          onComplete={(a) => { setAnswers(a); setRespondentMode('child'); setKiosk(false); setStep(4); }}
+          onExit={() => setKiosk(false)}
+        />
+      )}
     </div>
   );
 }
