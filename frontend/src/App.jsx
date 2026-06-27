@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ActivityProvider } from './context/ActivityContext';
 import { INSTRUMENT_MANAGER_ROLES } from './config/roles';
@@ -28,11 +28,22 @@ function Shell({ children }) {
   );
 }
 
+const DEMO = import.meta.env.VITE_DEMO_MODE === 'true';
+const Router = DEMO ? HashRouter : BrowserRouter;
+
+function DemoBadge() {
+  if (!DEMO) return null;
+  return (
+    <div style={{ position: 'fixed', bottom: 12, left: 12, zIndex: 200, background: 'var(--blue-600)', color: '#fff', fontFamily: 'var(--font-sans)', fontWeight: 800, fontSize: 11, letterSpacing: '0.06em', padding: '5px 11px', borderRadius: 'var(--radius-pill)', boxShadow: 'var(--shadow-md)', pointerEvents: 'none' }}>DEMO · SAMPLE DATA</div>
+  );
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <ActivityProvider>
-        <BrowserRouter>
+        <DemoBadge />
+        <Router>
           <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<ProtectedRoute><Shell><Dashboard /></Shell></ProtectedRoute>} />
@@ -44,7 +55,7 @@ export default function App() {
           <Route path="/users" element={<ProtectedRoute roles={['Administrator']}><Shell><Users /></Shell></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute roles={['Administrator']}><Shell><Settings /></Shell></ProtectedRoute>} />
           </Routes>
-        </BrowserRouter>
+        </Router>
       </ActivityProvider>
     </AuthProvider>
   );

@@ -1,8 +1,13 @@
 import axios from 'axios';
+import { mockAdapter } from './mockBackend';
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
 const api = axios.create({ baseURL });
+
+if (import.meta.env.VITE_DEMO_MODE === 'true') {
+  api.defaults.adapter = mockAdapter;
+}
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access');

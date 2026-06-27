@@ -69,6 +69,18 @@ export default function Login() {
             </Button>
           </form>
 
+          {import.meta.env.VITE_DEMO_MODE === 'true' && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-faint)', fontWeight: 700, letterSpacing: '0.04em', marginBottom: 8 }}>DEMO — TAP A ROLE TO ENTER</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[['Admin', 'admin@racco1.gov.ph'], ['Psychologist', 'psy@racco1.gov.ph'], ['Staff', 'staff@racco1.gov.ph']].map(([label, demoEmail]) => (
+                  <button key={demoEmail} type="button" onClick={() => login(demoEmail, 'demo').then(() => navigate('/')).catch(() => {})}
+                    style={{ flex: 1, padding: '9px 6px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', background: 'var(--surface)', color: 'var(--text-strong)', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 12.5, cursor: 'pointer' }}>{label}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div style={{ marginTop: 18, padding: '11px 14px', borderRadius: 'var(--radius-md)', background: 'var(--ink-50)', border: '1px solid var(--border)', fontSize: 12.5, color: 'var(--text-muted)', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
             <Icon name="shield-check" size={16} style={{ color: 'var(--blue-600)', marginTop: 1 }} />
             <span>Access is role-scoped and every action is logged for audit under <strong style={{ color: 'var(--text-strong)' }}>RA&nbsp;10173</strong>.</span>
