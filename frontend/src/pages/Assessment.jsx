@@ -1,42 +1,68 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api/client';
-import { Card, Button, Alert, Select, FormField, SeverityBadge, ConfidenceMeter, ProgressSteps, Icon, PAGE } from '../ui';
-import { questions, scoreToResult } from '../data/seedData';
+import { useActivity } from '../context/ActivityContext';
+import { Card, Button, Alert, Select, FormField, ProgressSteps, Icon, PAGE } from '../ui';
 
 function caseRef(id) { return `C-${String(id).padStart(4, '0')}`; }
 
+const CLASSIFICATIONS = ['Trauma / Stressor-related', 'Behavioral / Conduct', 'Adjustment Disorder', 'Normal Development'];
+
 export default function Assessment() {
+  const { refresh: refreshActivity } = useActivity();
   const [step, setStep] = useState(1);
   const [children, setChildren] = useState([]);
+  const [forms, setForms] = useState([]); // active questionnaires
   const [child, setChild] = useState('');
+  const [formId, setFormId] = useState('');
   const [stype, setStype] = useState('Intake / Baseline');
-  const [answers, setAnswers] = useState({});
-  const [agree, setAgree] = useState('');
-  const [cls, setCls] = useState('');
+  const [answers, setAnswers] = useState({}); // { [questionId]: answerText }
+  const [cls, setCls] = useState('Normal Development');
   const [notes, setNotes] = useState('');
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
 
-  useEffect(() => { api.get('/children/').then((r) => setChildren(r.data)).catch(() => {}); }, []);
+  useEffect(() => {
+    api.get('/children/').then((r) => setChildren(r.data)).catch(() => {});
+    api.get('/active-questionnaires/').then((r) => setForms(r.data)).catch(() => {});
+  }, []);
 
-  const total = Object.values(answers).reduce((a, b) => a + b, 0);
-  const allAnswered = questions.every((_, i) => answers[i] != null);
-  const result = scoreToResult(total);
   const childObj = children.find((c) => String(c.id) === String(child));
+  const form = forms.find((f) => String(f.id) === String(formId));
+  const questions = form?.questions || [];
+  const allAnswered = questions.length > 0 && questions.every((q) => answers[q.id] != null && answers[q.id] !== '');
 
-  const next = () => setStep((s) => {
-    const n = Math.min(4, s + 1);
-    if (n === 4 && !cls) setCls(result.cls);
-    return n;
-  });
+  const next = () => setStep((s) => Math.min(4, s + 1));
   const back = () => setStep((s) => Math.max(1, s - 1));
-  const sign = () => { setSent(true); setTimeout(() => setSent(false), 3400); };
+
+  const submit = async () => {
+    setError('');
+    try {
+      await api.post('/assessments/', {
+        child: Number(child),
+        questionnaire: form.id,
+        assessment_type: stype,
+        classification: cls,
+        notes,
+        responses: questions.map((q) => ({ question: q.id, answer: String(answers[q.id]) })),
+      });
+      setSent(true);
+      refreshActivity();
+      setTimeout(() => {
+        setSent(false); setStep(1); setChild(''); setFormId(''); setAnswers({}); setNotes('');
+      }, 2600);
+    } catch (err) {
+      setError(JSON.stringify(err.response?.data || 'Submit failed'));
+    }
+  };
+
+  const setAnswer = (qid, val) => setAnswers((a) => ({ ...a, [qid]: val }));
 
   return (
     <div style={PAGE}>
       <div style={{ maxWidth: 760, margin: '0 auto' }}>
         <Card padding="28px">
           <div style={{ marginBottom: 26 }}>
-            <ProgressSteps steps={['Select Child', 'Session Details', 'Questionnaire', 'AI Analysis & Notes']} current={step} />
+            <ProgressSteps steps={['Select Child', 'Questionnaire', 'Responses', 'Review & Sign']} current={step} />
           </div>
 
           {step === 1 && (
@@ -60,38 +86,37 @@ export default function Assessment() {
 
           {step === 2 && (
             <div>
-              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 700, marginBottom: 18 }}>Session information</h2>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
-                <FormField label="Session Date"><Select defaultValue="today"><option value="today">Today</option><option>Schedule for later…</option></Select></FormField>
-                <FormField label="Session Type">
-                  <Select value={stype} onChange={(e) => setStype(e.target.value)}>
-                    <option>Intake / Baseline</option><option>Regular Check-in</option><option>Incident Follow-up</option>
-                  </Select>
-                </FormField>
-              </div>
-              <div style={{ marginTop: 18 }}>
-                <Alert tone="info" icon={<Icon name="info" size={18} />}>Responses are confidential and protected under <strong>RA 10173 (Data Privacy Act)</strong>.</Alert>
-              </div>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 700, marginBottom: 18 }}>Choose a questionnaire</h2>
+              {forms.length === 0
+                ? <Alert tone="warning" icon={<Icon name="alert-triangle" size={18} />}>No published questionnaires yet. Create and publish one under <strong>Assessment Instruments</strong> first.</Alert>
+                : (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+                    <FormField label="Instrument">
+                      <Select value={formId} onChange={(e) => { setFormId(e.target.value); setAnswers({}); }}>
+                        <option value="">— Select —</option>
+                        {forms.map((f) => <option key={f.id} value={f.id}>{f.title}{f.age_group ? ` (${f.age_group})` : ''}</option>)}
+                      </Select>
+                    </FormField>
+                    <FormField label="Session Type">
+                      <Select value={stype} onChange={(e) => setStype(e.target.value)}>
+                        <option>Intake / Baseline</option><option>Regular Check-in</option><option>Incident Follow-up</option>
+                      </Select>
+                    </FormField>
+                  </div>
+                )}
+              {form && <div style={{ marginTop: 14, fontSize: 13, color: 'var(--text-muted)' }}>{questions.length} question(s){form.description ? ` · ${form.description}` : ''}</div>}
             </div>
           )}
 
           {step === 3 && (
             <div>
-              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 700, marginBottom: 4 }}>Clinical questionnaire</h2>
-              <p style={{ fontSize: 13.5, color: 'var(--text-muted)', marginBottom: 18 }}>Rate each item from 1 (Never) to 5 (Always) based on the session.</p>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 700, marginBottom: 4 }}>{form?.title || 'Questionnaire'}</h2>
+              <p style={{ fontSize: 13.5, color: 'var(--text-muted)', marginBottom: 18 }}>Answer each item based on the session.</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {questions.map((qn, i) => (
-                  <div key={i} style={{ background: 'var(--ink-50)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '14px 16px' }}>
-                    <p style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-strong)', marginBottom: 11 }}>{i + 1}. {qn}</p>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      {[1, 2, 3, 4, 5].map((n) => {
-                        const on = answers[i] === n;
-                        return (
-                          <button key={n} onClick={() => setAnswers((a) => ({ ...a, [i]: n }))} style={{ width: 40, height: 40, borderRadius: '50%', cursor: 'pointer', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, border: `2px solid ${on ? 'var(--blue-600)' : 'var(--border-strong)'}`, background: on ? 'var(--blue-600)' : 'var(--surface)', color: on ? '#fff' : 'var(--text-muted)', transform: on ? 'scale(1.08)' : 'none', boxShadow: on ? 'var(--shadow-brand)' : 'none', transition: 'var(--transition-base)' }}>{n}</button>
-                        );
-                      })}
-                      <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-faint)', paddingBottom: 3, marginLeft: 6 }}><span>Never</span><span>Always</span></div>
-                    </div>
+                {questions.map((q, i) => (
+                  <div key={q.id} style={{ background: 'var(--ink-50)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '14px 16px' }}>
+                    <p style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-strong)', marginBottom: 11 }}>{i + 1}. {q.question_text}</p>
+                    <QuestionInput question={q} value={answers[q.id]} onChange={(v) => setAnswer(q.id, v)} />
                   </div>
                 ))}
               </div>
@@ -102,50 +127,30 @@ export default function Assessment() {
             <div>
               {sent && (
                 <div style={{ position: 'fixed', top: 78, right: 26, zIndex: 50 }}>
-                  <Alert tone="success" icon={<Icon name="check-circle-2" size={18} />} style={{ boxShadow: 'var(--shadow-lg)' }}>Assessment signed &amp; submitted securely to NACC.</Alert>
+                  <Alert tone="success" icon={<Icon name="check-circle-2" size={18} />} style={{ boxShadow: 'var(--shadow-lg)' }}>Assessment saved to NACC.</Alert>
                 </div>
               )}
+              {error && <Alert tone="danger" icon={<Icon name="alert-triangle" size={18} />} style={{ marginBottom: 14 }}>{error}</Alert>}
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <span style={{ width: 28, height: 28, borderRadius: 'var(--radius-md)', background: 'var(--blue-600)', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}><Icon name="sparkles" size={16} /></span>
-                <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 700, margin: 0 }}>AI sentiment analysis</h2>
-              </div>
-              {childObj && <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 14px' }}>For <strong style={{ color: 'var(--text-strong)' }}>{childObj.fullname}</strong> · <span className="racco-mono">{caseRef(childObj.id)}</span> · {stype}</p>}
+              {childObj && <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 14px' }}>For <strong style={{ color: 'var(--text-strong)' }}>{childObj.fullname}</strong> · <span className="racco-mono">{caseRef(childObj.id)}</span> · {form?.title} · {stype}</p>}
 
-              <div style={{ background: result.tone === 'danger' ? 'var(--red-50)' : result.tone === 'warning' ? 'var(--warning-50)' : 'var(--success-50)', border: `1px solid ${result.tone === 'danger' ? 'var(--red-100)' : result.tone === 'warning' ? 'var(--warning-100)' : 'var(--success-100)'}`, borderRadius: 'var(--radius-xl)', padding: 22 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
-                  <SeverityBadge level={result.level} size="lg">{result.label}</SeverityBadge>
-                  <div style={{ width: 200 }}><ConfidenceMeter value={result.conf} tone={result.tone === 'danger' ? 'danger' : result.tone === 'warning' ? 'warning' : 'success'} threshold={80} /></div>
+              <div style={{ background: 'var(--ink-50)', border: '1px dashed var(--border-strong)', borderRadius: 'var(--radius-xl)', padding: 22, marginBottom: 18 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Icon name="sparkles" size={18} style={{ color: 'var(--text-faint)' }} />
+                  <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-muted)' }}>Automated analysis arrives in Phase 3</span>
                 </div>
-                <p style={{ fontSize: 15, color: 'var(--text-strong)', fontWeight: 600, lineHeight: 1.55, margin: '16px 0 14px' }}>{result.text}</p>
-                <Alert disclaimer title="Disclaimer:">This output is decision-support only and does not replace the professional clinical diagnosis mandated by NACC guidelines.</Alert>
+                <p style={{ fontSize: 13, color: 'var(--text-faint)', margin: '8px 0 0' }}>Behavioral scoring and AI recommendations will appear here once the analysis engine is built. For now, record your clinical judgment below.</p>
               </div>
 
-              <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                  <span style={{ width: 28, height: 28, borderRadius: 'var(--radius-md)', background: 'var(--ink-100)', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}><Icon name="file-pen-line" size={16} /></span>
-                  <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 700, margin: 0 }}>Clinical notes</h2>
-                </div>
-
-                <div style={{ background: 'var(--ink-50)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 16, marginBottom: 16 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text-strong)', marginBottom: 10 }}>Do you agree with the AI classification?</div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {['Agree', 'Partially', 'Disagree'].map((o) => (
-                      <button key={o} onClick={() => setAgree(o)} style={{ flex: 1, padding: '9px 8px', cursor: 'pointer', borderRadius: 'var(--radius-md)', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 13, border: `1.5px solid ${agree === o ? 'var(--blue-600)' : 'var(--border-strong)'}`, background: agree === o ? 'var(--blue-600)' : 'var(--surface)', color: agree === o ? '#fff' : 'var(--text-body)', transition: 'var(--transition-base)' }}>{o}</button>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <FormField label="Final practitioner classification">
-                    <Select value={cls} onChange={(e) => setCls(e.target.value)}>
-                      <option>Trauma / Stressor-related</option><option>Behavioral / Conduct</option><option>Adjustment Disorder</option><option>Normal Development</option>
-                    </Select>
-                  </FormField>
-                  <FormField label="Detailed psychologist's assessment" required hint="Required before the assessment can be signed.">
-                    <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={6} placeholder="Observations, behavioral patterns, recommended interventions…" style={{ width: '100%', resize: 'vertical', padding: '12px 13px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--text-strong)', outline: 'none', lineHeight: 1.55 }} />
-                  </FormField>
-                </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <FormField label="Practitioner classification">
+                  <Select value={cls} onChange={(e) => setCls(e.target.value)}>
+                    {CLASSIFICATIONS.map((c) => <option key={c}>{c}</option>)}
+                  </Select>
+                </FormField>
+                <FormField label="Detailed psychologist's assessment" required hint="Required before the assessment can be signed.">
+                  <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={6} placeholder="Observations, behavioral patterns, recommended interventions…" style={{ width: '100%', resize: 'vertical', padding: '12px 13px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--text-strong)', outline: 'none', lineHeight: 1.55 }} />
+                </FormField>
               </div>
             </div>
           )}
@@ -153,11 +158,39 @@ export default function Assessment() {
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 26, paddingTop: 18, borderTop: '1px solid var(--border)' }}>
             <Button variant="ghost" disabled={step === 1} onClick={back} iconLeft={<Icon name="arrow-left" size={17} />}>Back</Button>
             {step < 4
-              ? <Button variant="primary" onClick={next} disabled={(step === 1 && !child) || (step === 3 && !allAnswered)} iconRight={<Icon name="arrow-right" size={17} />}>{step === 3 ? 'Run AI Analysis' : 'Next Step'}</Button>
-              : <Button variant="primary" disabled={!agree || !notes.trim()} onClick={sign} iconLeft={<Icon name="pen-line" size={17} />}>Sign &amp; Submit to NACC</Button>}
+              ? <Button variant="primary" onClick={next} disabled={(step === 1 && !child) || (step === 2 && !formId) || (step === 3 && !allAnswered)} iconRight={<Icon name="arrow-right" size={17} />}>Next Step</Button>
+              : <Button variant="primary" disabled={!notes.trim() || sent} onClick={submit} iconLeft={<Icon name="pen-line" size={17} />}>Sign &amp; Submit to NACC</Button>}
           </div>
         </Card>
       </div>
+    </div>
+  );
+}
+
+function QuestionInput({ question, value, onChange }) {
+  const type = question.question_type;
+  const pill = (label, on) => ({
+    padding: '8px 14px', borderRadius: 'var(--radius-pill)', cursor: 'pointer', fontFamily: 'var(--font-sans)',
+    fontWeight: 700, fontSize: 13, border: `1.5px solid ${on ? 'var(--blue-600)' : 'var(--border-strong)'}`,
+    background: on ? 'var(--blue-600)' : 'var(--surface)', color: on ? '#fff' : 'var(--text-body)', transition: 'var(--transition-base)',
+  });
+  if (type === 'rating_scale') {
+    return (
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button key={n} onClick={() => onChange(String(n))} style={{ ...pill(String(n), value === String(n)), width: 40, height: 40, borderRadius: '50%', padding: 0 }}>{n}</button>
+        ))}
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-faint)', marginLeft: 6 }}><span>Never</span><span>Always</span></div>
+      </div>
+    );
+  }
+  const opts = type === 'yes_no' ? ['Yes', 'No'] : (question.options || []);
+  if (opts.length === 0) {
+    return <input value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder="Answer" style={{ width: '100%', padding: '9px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: 14 }} />;
+  }
+  return (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      {opts.map((o) => <button key={o} onClick={() => onChange(o)} style={pill(o, value === o)}>{o}</button>)}
     </div>
   );
 }
