@@ -172,3 +172,15 @@ class AssessmentTakingTest(APITestCase):
         self._auth("a@racco1.gov.ph")
         resp = self.client.get("/api/assessments/")
         self.assertEqual(len(resp.data), 1)
+
+    def test_respondent_mode_defaults_to_staff(self):
+        self._auth("p@racco1.gov.ph")
+        self.client.post("/api/assessments/", self._assessment_payload(), format="json")
+        self.assertEqual(Assessment.objects.get().respondent_mode, "staff")
+
+    def test_respondent_mode_child_is_saved(self):
+        self._auth("p@racco1.gov.ph")
+        payload = self._assessment_payload()
+        payload["respondent_mode"] = "child"
+        self.client.post("/api/assessments/", payload, format="json")
+        self.assertEqual(Assessment.objects.get().respondent_mode, "child")

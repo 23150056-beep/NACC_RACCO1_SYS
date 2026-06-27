@@ -47,6 +47,9 @@ class Assessment(models.Model):
     status = models.CharField(max_length=50, default="ongoing")
     notes = models.TextField(blank=True)
     classification = models.CharField(max_length=50, blank=True)
+    STAFF, CHILD = "staff", "child"
+    RESPONDENT_CHOICES = [(STAFF, "Staff"), (CHILD, "Child")]
+    respondent_mode = models.CharField(max_length=10, choices=RESPONDENT_CHOICES, default=STAFF)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

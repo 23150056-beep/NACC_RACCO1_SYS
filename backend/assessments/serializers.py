@@ -51,7 +51,8 @@ class AssessmentWriteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Assessment
-        fields = ["id", "child", "questionnaire", "assessment_type", "notes", "classification", "responses"]
+        fields = ["id", "child", "questionnaire", "assessment_type", "notes",
+                  "classification", "respondent_mode", "responses"]
 
     def create(self, validated_data):
         responses = validated_data.pop("responses", [])
