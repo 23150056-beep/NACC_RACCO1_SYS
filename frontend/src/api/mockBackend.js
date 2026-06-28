@@ -1,13 +1,13 @@
 // In-browser mock of the Django API for the static GitHub Pages demo.
 // Activated only when VITE_DEMO_MODE === 'true' (see api/client.js).
-const KEY = 'nacc_demo_db';
+const KEY = 'nacc_demo_db_v2';
 
 const mkUser = (id, email, first, last, role, role_name) => ({
   id, email, username: email.split('@')[0], first_name: first, last_name: last,
   middle_initial: '', contact_details: '', role, role_name,
   fullname: `${first} ${last}`, status: 'active',
 });
-const q = (id, text, type, options = [], order = 1) => ({ id, question_text: text, question_type: type, options, order });
+const q = (id, text, type, options = [], order = 1, concern_direction = 'higher', concern_options = []) => ({ id, question_text: text, question_type: type, options, order, concern_direction, concern_options });
 
 function seed() {
   const roles = [
@@ -36,14 +36,14 @@ function seed() {
   ];
   const questionnaires = [
     { id: 31, title: 'Child Wellbeing Check', age_group: '5-8', description: 'General wellbeing screen.', status: 'active', questions: [
-      q(101, 'The child is calm during sessions.', 'rating_scale', [], 1),
-      q(102, 'Does the child sleep well?', 'yes_no', [], 2),
-      q(103, 'The child interacts with peers.', 'rating_scale', [], 3),
+      q(101, 'The child is calm during sessions.', 'rating_scale', [], 1, 'lower'),
+      q(102, 'Does the child sleep well?', 'yes_no', [], 2, 'lower'),
+      q(103, 'The child interacts with peers.', 'rating_scale', [], 3, 'lower'),
     ] },
     { id: 32, title: 'Emotional Check-in', age_group: '5-8', description: 'How the child feels.', status: 'active', questions: [
-      q(111, 'How are you feeling today?', 'rating_scale', [], 1),
-      q(112, 'Which best describes your mood?', 'emotion', ['Happy', 'Sad', 'Scared', 'Angry', 'Calm'], 2),
-      q(113, 'Did you feel safe this week?', 'yes_no', [], 3),
+      q(111, 'How are you feeling today?', 'rating_scale', [], 1, 'lower'),
+      q(112, 'Which best describes your mood?', 'emotion', ['Happy', 'Sad', 'Scared', 'Angry', 'Calm'], 2, 'higher', ['Sad', 'Scared', 'Angry']),
+      q(113, 'Did you feel safe this week?', 'yes_no', [], 3, 'lower'),
     ] },
   ];
   const activity = [
@@ -76,6 +76,57 @@ function logActivity(action, category, entity_type, entity_label, entity_id) {
     entity_type, entity_label: entity_label || '', entity_id: entity_id ?? null,
     created_at: new Date().toISOString(),
   });
+}
+
+// Mirrors backend assessments/analysis (scoring.py + recommendations.py) for the demo.
+function concernFor(question, answer) {
+  answer = (answer || '').trim();
+  const t = question.question_type;
+  if (t === 'rating_scale') {
+    const v = parseInt(answer, 10);
+    if (Number.isNaN(v) || v < 1 || v > 5) return null;
+    return question.concern_direction !== 'lower' ? (v - 1) / 4 : (5 - v) / 4;
+  }
+  if (t === 'yes_no') {
+    const ca = question.concern_direction !== 'lower' ? 'yes' : 'no';
+    return answer.toLowerCase() === ca ? 1 : 0;
+  }
+  if (t === 'multiple_choice' || t === 'emotion') {
+    const opts = question.concern_options || [];
+    if (!opts.length) return null;
+    return opts.includes(answer) ? 1 : 0;
+  }
+  return null;
+}
+function scoreQ(questionnaire, responses) {
+  const qmap = {};
+  (questionnaire.questions || []).forEach((qq) => { qmap[qq.id] = qq; });
+  const items = [];
+  (responses || []).forEach((r) => {
+    const qq = qmap[Number(r.question)];
+    if (!qq) return;
+    const c = concernFor(qq, String(r.answer == null ? '' : r.answer));
+    if (c == null) return;
+    items.push([qq, c]);
+  });
+  const total = (questionnaire.questions || []).length;
+  if (!items.length) return { behavioral_score: null, classification: 'Needs Monitoring', scored_count: 0, total_count: total, top_concerns: [] };
+  const score = Math.round((items.reduce((s, [, c]) => s + c, 0) / items.length) * 100 * 100) / 100;
+  const classification = score < 34 ? 'Normal' : score < 67 ? 'Needs Monitoring' : 'Needs Counseling Attention';
+  const top = items.filter(([, c]) => c >= 0.5).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([qq]) => qq.question_text);
+  return { behavioral_score: score, classification, scored_count: items.length, total_count: total, top_concerns: top };
+}
+const REC_TEMPLATES = {
+  'Normal': ['Low', 'The child appears to be adjusting well; responses show no significant behavioral concerns.', 'continue routine periodic check-ins'],
+  'Needs Monitoring': ['Medium', 'Some responses indicate mild-to-moderate behavioral concerns{focus}.', 'increase observation, schedule a follow-up within 4 weeks, and introduce light supportive measures'],
+  'Needs Counseling Attention': ['High', 'Responses indicate notable behavioral concerns requiring attention{focus}.', 'arrange focused counseling support, coordinate with the house parent or guardian, and reassess within 1-2 weeks'],
+};
+function recommend(result) {
+  const [priority, summary, actions] = REC_TEMPLATES[result.classification] || REC_TEMPLATES['Needs Monitoring'];
+  const top = result.top_concerns || [];
+  const focus = top.length ? `, notably around: ${top.join('; ')}` : '';
+  const text = `${summary.replace('{focus}', focus)} Suggested actions: ${actions}. This is decision support, not a diagnosis; the final determination rests with the licensed professional.`;
+  return { recommendation_text: text, priority_level: priority };
 }
 
 const ok = (data, status = 200) => ({ data, status });
@@ -162,12 +213,33 @@ function handle(method, url, body, config) {
   }
 
   // --- assessments / activity ---
+  if (url === '/assessments/analyze/' && method === 'post') {
+    const qn = db.questionnaires.find((x) => x.id === Number(body.questionnaire));
+    const result = scoreQ(qn || { questions: [] }, body.responses || []);
+    return ok({ ...result, ...recommend(result) });
+  }
   if (url === '/assessments/' && method === 'post') {
-    const a = { id: nextId(), ...body, psychologist: actor?.id, status: 'completed', assessment_date: new Date().toISOString().slice(0, 10) };
-    db.assessments.push(a);
-    logActivity('created', 'record', 'Assessment', db.children.find((c) => c.id === Number(body.child))?.fullname || 'child', a.id);
+    const qn = db.questionnaires.find((x) => x.id === Number(body.questionnaire));
+    const c = db.children.find((x) => x.id === Number(body.child));
+    const result = scoreQ(qn || { questions: [] }, body.responses || []);
+    const rec = recommend(result);
+    const a = {
+      id: nextId(), child: body.child, child_name: c?.fullname || '', child_case_type: c?.case_type || '',
+      questionnaire: body.questionnaire, questionnaire_title: qn?.title || '', assessment_type: body.assessment_type || '',
+      classification: body.classification || '', notes: body.notes || '', respondent_mode: body.respondent_mode || 'staff',
+      psychologist: actor?.id, psychologist_name: actor?.fullname || '', status: 'completed',
+      assessment_date: new Date().toISOString().slice(0, 10),
+      result: { behavioral_score: result.behavioral_score, classification: result.classification, generated_date: new Date().toISOString(), priority_level: rec.priority_level, recommendation_text: rec.recommendation_text },
+    };
+    db.assessments.unshift(a);
+    logActivity('created', 'record', 'Assessment', c?.fullname || 'child', a.id);
     save();
     return ok(a, 201);
+  }
+  if (url === '/assessments/' && method === 'get') {
+    let list = db.assessments;
+    if (actor && actor.role_name === 'Psychologist') list = list.filter((a) => a.psychologist === actor.id);
+    return ok(list);
   }
   if (url.startsWith('/activity/') && method === 'get') {
     const cat = config.params?.category;
