@@ -209,3 +209,18 @@ class AssessmentTakingTest(APITestCase):
         self.assertEqual(AssessmentResult.objects.count(), 1)
         self.assertEqual(Recommendation.objects.count(), 1)
         self.assertTrue(AssessmentResult.objects.first().classification)
+
+    def test_staff_can_view_results_sees_all(self):
+        Assessment.objects.create(child=self.child, psychologist=self.psy, questionnaire=self.qn, status="completed")
+        self._auth("s@racco1.gov.ph")
+        resp = self.client.get("/api/assessments/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 1)
+
+    def test_result_included_in_list(self):
+        self._auth("p@racco1.gov.ph")
+        self.client.post("/api/assessments/", self._assessment_payload(), format="json")
+        resp = self.client.get("/api/assessments/")
+        self.assertIsNotNone(resp.data[0]["result"])
+        self.assertIn("behavioral_score", resp.data[0]["result"])
+        self.assertIn("notes", resp.data[0])

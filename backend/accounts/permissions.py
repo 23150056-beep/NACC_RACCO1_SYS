@@ -57,3 +57,14 @@ class CanTakeAssessments(BasePermission):
     def has_permission(self, request, view):
         return bool(request.user and request.user.is_authenticated
                     and _role_name(request) in ASSESSMENT_TAKER_ROLES)
+
+
+# Roles allowed to VIEW assessment results (read-only). Staff is included for
+# case coordination; creating/running assessments stays ASSESSMENT_TAKER_ROLES.
+RESULT_VIEWER_ROLES = (Role.ADMINISTRATOR, Role.PSYCHOLOGIST, Role.STAFF)
+
+
+class CanViewResults(BasePermission):
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated
+                    and _role_name(request) in RESULT_VIEWER_ROLES)

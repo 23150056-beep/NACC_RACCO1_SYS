@@ -66,13 +66,20 @@ class AssessmentWriteSerializer(serializers.ModelSerializer):
 
 class AssessmentListSerializer(serializers.ModelSerializer):
     child_name = serializers.CharField(source="child.fullname", read_only=True)
+    child_case_type = serializers.CharField(source="child.case_type", read_only=True, default="")
     questionnaire_title = serializers.CharField(source="questionnaire.title", read_only=True, default=None)
     psychologist_name = serializers.CharField(source="psychologist.fullname", read_only=True)
+    result = serializers.SerializerMethodField()
 
     class Meta:
         model = Assessment
-        fields = ["id", "child", "child_name", "questionnaire", "questionnaire_title",
-                  "psychologist_name", "assessment_type", "classification", "status", "assessment_date"]
+        fields = ["id", "child", "child_name", "child_case_type", "questionnaire", "questionnaire_title",
+                  "psychologist_name", "assessment_type", "classification", "notes",
+                  "status", "assessment_date", "result"]
+
+    def get_result(self, obj):
+        ar = getattr(obj, "result", None)
+        return AssessmentResultSerializer(ar).data if ar else None
 
 
 class AssessmentResultSerializer(serializers.ModelSerializer):

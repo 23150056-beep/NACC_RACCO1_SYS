@@ -4,7 +4,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 
 from accounts.models import Role
-from accounts.permissions import CanManageInstruments, CanTakeAssessments
+from accounts.permissions import CanManageInstruments, CanTakeAssessments, CanViewResults
 from activity.models import ActivityLog
 from activity.services import log_activity
 from assessments.models import Questionnaire, Assessment, AssessmentResult, Recommendation
@@ -87,13 +87,20 @@ class ActiveQuestionnaireListView(generics.ListAPIView):
 
 
 class AssessmentViewSet(viewsets.ModelViewSet):
-    permission_classes = [CanTakeAssessments]
     pagination_class = None
 
+    def get_permissions(self):
+        if self.action in ("list", "retrieve"):
+            return [CanViewResults()]
+        return [CanTakeAssessments()]
+
     def get_queryset(self):
-        qs = Assessment.objects.select_related("child", "questionnaire", "psychologist").order_by("-assessment_date", "-id")
+        qs = (Assessment.objects
+              .select_related("child", "questionnaire", "psychologist", "result")
+              .prefetch_related("result__recommendations")
+              .order_by("-assessment_date", "-id"))
         role = getattr(getattr(self.request.user, "role", None), "role_name", None)
-        if role != Role.ADMINISTRATOR:
+        if role == Role.PSYCHOLOGIST:
             qs = qs.filter(psychologist=self.request.user)
         return qs
 
