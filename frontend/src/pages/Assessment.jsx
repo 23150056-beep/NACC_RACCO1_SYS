@@ -23,11 +23,23 @@ export default function Assessment() {
   const [error, setError] = useState('');
   const [kiosk, setKiosk] = useState(false);
   const [respondentMode, setRespondentMode] = useState('staff');
+  const [analysis, setAnalysis] = useState(null);
+  const [analyzing, setAnalyzing] = useState(false);
 
   useEffect(() => {
     api.get('/children/').then((r) => setChildren(r.data)).catch(() => {});
     api.get('/active-questionnaires/').then((r) => setForms(r.data)).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (step !== 4 || !form) return;
+    setAnalysis(null); setAnalyzing(true);
+    api.post('/assessments/analyze/', {
+      questionnaire: form.id,
+      responses: questions.map((q) => ({ question: q.id, answer: String(answers[q.id]) })),
+    }).then((r) => setAnalysis(r.data)).catch(() => {}).finally(() => setAnalyzing(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   const childObj = children.find((c) => String(c.id) === String(child));
   const form = forms.find((f) => String(f.id) === String(formId));
@@ -52,7 +64,7 @@ export default function Assessment() {
       setSent(true);
       refreshActivity();
       setTimeout(() => {
-        setSent(false); setStep(1); setChild(''); setFormId(''); setAnswers({}); setNotes(''); setRespondentMode('staff');
+        setSent(false); setStep(1); setChild(''); setFormId(''); setAnswers({}); setNotes(''); setRespondentMode('staff'); setAnalysis(null);
       }, 2600);
     } catch (err) {
       setError(JSON.stringify(err.response?.data || 'Submit failed'));
@@ -143,13 +155,7 @@ export default function Assessment() {
 
               {childObj && <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 14px' }}>For <strong style={{ color: 'var(--text-strong)' }}>{childObj.fullname}</strong> · <span className="racco-mono">{caseRef(childObj.id)}</span> · {form?.title} · {stype}</p>}
 
-              <div style={{ background: 'var(--ink-50)', border: '1px dashed var(--border-strong)', borderRadius: 'var(--radius-xl)', padding: 22, marginBottom: 18 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Icon name="sparkles" size={18} style={{ color: 'var(--text-faint)' }} />
-                  <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-muted)' }}>Automated analysis arrives in Phase 3</span>
-                </div>
-                <p style={{ fontSize: 13, color: 'var(--text-faint)', margin: '8px 0 0' }}>Behavioral scoring and AI recommendations will appear here once the analysis engine is built. For now, record your clinical judgment below.</p>
-              </div>
+              <AnalysisPanel analyzing={analyzing} analysis={analysis} />
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <FormField label="Practitioner classification">
@@ -209,6 +215,37 @@ function QuestionInput({ question, value, onChange }) {
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
       {opts.map((o) => <button key={o} onClick={() => onChange(o)} style={pill(o, value === o)}>{o}</button>)}
+    </div>
+  );
+}
+
+const TRIAGE_TONE = {
+  'Normal': { bg: 'var(--success-50)', line: 'var(--success-100)', fg: 'var(--success-700)' },
+  'Needs Monitoring': { bg: 'var(--warning-50)', line: 'var(--warning-100)', fg: 'var(--warning-700)' },
+  'Needs Counseling Attention': { bg: 'var(--red-50)', line: 'var(--red-100)', fg: 'var(--red-700)' },
+};
+
+function AnalysisPanel({ analyzing, analysis }) {
+  const tone = TRIAGE_TONE[analysis?.classification] || TRIAGE_TONE['Needs Monitoring'];
+  return (
+    <div style={{ background: analysis ? tone.bg : 'var(--ink-50)', border: `1px solid ${analysis ? tone.line : 'var(--border-strong)'}`, borderRadius: 'var(--radius-xl)', padding: 22, marginBottom: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <Icon name="sparkles" size={18} style={{ color: analysis ? tone.fg : 'var(--text-faint)' }} />
+        <span style={{ fontWeight: 800, fontSize: 14, color: 'var(--text-strong)' }}>Automated analysis</span>
+      </div>
+      {analyzing && <p style={{ fontSize: 13.5, color: 'var(--text-muted)', margin: 0 }}>Analyzing responses…</p>}
+      {!analyzing && !analysis && <p style={{ fontSize: 13.5, color: 'var(--text-faint)', margin: 0 }}>Analysis unavailable — record your clinical judgment below.</p>}
+      {!analyzing && analysis && (
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 17, color: tone.fg }}>{analysis.classification}</span>
+            {analysis.behavioral_score != null && <span className="racco-mono" style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>Score {analysis.behavioral_score} / 100</span>}
+            <span style={{ fontSize: 11.5, color: 'var(--text-faint)' }}>based on {analysis.scored_count} of {analysis.total_count} items</span>
+          </div>
+          <p style={{ fontSize: 13.5, color: 'var(--text-body)', lineHeight: 1.6, margin: '0 0 8px' }}>{analysis.recommendation_text}</p>
+          <span style={{ display: 'inline-block', fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: tone.fg }}>Priority: {analysis.priority_level}</span>
+        </div>
+      )}
     </div>
   );
 }

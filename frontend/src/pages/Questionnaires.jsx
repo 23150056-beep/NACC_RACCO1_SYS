@@ -11,7 +11,7 @@ const TYPES = [
 ];
 const HAS_OPTIONS = (t) => t === 'multiple_choice' || t === 'emotion';
 const STATUS_TONE = { draft: 'neutral', active: 'success', archived: 'amber' };
-const blankQuestion = (order) => ({ question_text: '', question_type: 'rating_scale', options: [], order });
+const blankQuestion = (order) => ({ question_text: '', question_type: 'rating_scale', options: [], concern_direction: 'higher', concern_options: [], order });
 const blankForm = () => ({ title: '', age_group: '', description: '', status: 'draft', questions: [blankQuestion(1)] });
 
 export default function Questionnaires() {
@@ -31,7 +31,7 @@ export default function Questionnaires() {
     setError(''); setBanner('');
     api.get(`/questionnaires/${qn.id}/`).then((r) => setForm({
       ...r.data,
-      questions: (r.data.questions.length ? r.data.questions : [blankQuestion(1)]).map((q) => ({ ...q, options: q.options || [] })),
+      questions: (r.data.questions.length ? r.data.questions : [blankQuestion(1)]).map((q) => ({ ...q, options: q.options || [], concern_direction: q.concern_direction || 'higher', concern_options: q.concern_options || [] })),
     }));
   };
 
@@ -46,7 +46,7 @@ export default function Questionnaires() {
       const { data } = await api.post('/questionnaires/extract/', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
       setForm({
         title: data.title || '', age_group: data.age_group || '', description: '', status: 'draft',
-        questions: (data.questions.length ? data.questions : [blankQuestion(1)]).map((q) => ({ ...q, options: q.options || [] })),
+        questions: (data.questions.length ? data.questions : [blankQuestion(1)]).map((q) => ({ ...q, options: q.options || [], concern_direction: q.concern_direction || 'higher', concern_options: q.concern_options || [] })),
       });
       setBanner(`Imported ${data.questions.length} question(s) from “${file.name}”. Review and fix each one before publishing.`);
     } catch (err) {
@@ -73,7 +73,7 @@ export default function Questionnaires() {
       status: publish ? 'active' : (form.status === 'archived' ? 'draft' : form.status),
       questions: form.questions
         .filter((q) => q.question_text.trim())
-        .map((q, i) => ({ question_text: q.question_text, question_type: q.question_type, options: HAS_OPTIONS(q.question_type) ? q.options : [], order: i + 1 })),
+        .map((q, i) => ({ question_text: q.question_text, question_type: q.question_type, options: HAS_OPTIONS(q.question_type) ? q.options : [], concern_direction: q.concern_direction || 'higher', concern_options: HAS_OPTIONS(q.question_type) ? (q.concern_options || []) : [], order: i + 1 })),
     };
     if (!payload.title.trim()) { setError('Title is required.'); return; }
     if (payload.questions.length === 0) { setError('Add at least one question.'); return; }
@@ -175,6 +175,21 @@ export default function Questionnaires() {
                       </div>
                       {HAS_OPTIONS(q.question_type) && (
                         <Input value={(q.options || []).join(', ')} onChange={(e) => setQuestion(i, { options: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} placeholder="Options, comma-separated" />
+                      )}
+                      {q.question_type === 'rating_scale' && (
+                        <Select value={q.concern_direction || 'higher'} onChange={(e) => setQuestion(i, { concern_direction: e.target.value })}>
+                          <option value="higher">Concern = higher ratings</option>
+                          <option value="lower">Concern = lower ratings</option>
+                        </Select>
+                      )}
+                      {q.question_type === 'yes_no' && (
+                        <Select value={q.concern_direction || 'higher'} onChange={(e) => setQuestion(i, { concern_direction: e.target.value })}>
+                          <option value="higher">Concern answer: Yes</option>
+                          <option value="lower">Concern answer: No</option>
+                        </Select>
+                      )}
+                      {HAS_OPTIONS(q.question_type) && (
+                        <Input value={(q.concern_options || []).join(', ')} onChange={(e) => setQuestion(i, { concern_options: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} placeholder="Concerning options (comma-separated, must match options)" />
                       )}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
