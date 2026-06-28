@@ -28,6 +28,10 @@ class Question(models.Model):
     question_type = models.CharField(max_length=50)
     options = models.JSONField(default=list, blank=True)
     order = models.PositiveIntegerField(default=0)
+    HIGHER, LOWER = "higher", "lower"
+    CONCERN_CHOICES = [(HIGHER, "Higher"), (LOWER, "Lower")]
+    concern_direction = models.CharField(max_length=10, choices=CONCERN_CHOICES, default=HIGHER)
+    concern_options = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

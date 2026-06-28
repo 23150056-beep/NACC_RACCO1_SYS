@@ -41,6 +41,15 @@ class QuestionnaireFieldsTest(TestCase):
         self.assertEqual(q.options, [])
 
 
+class ConcernFieldsTest(TestCase):
+    def test_question_concern_defaults(self):
+        from assessments.models import Questionnaire, Question
+        qn = Questionnaire.objects.create(title="S", status="active")
+        q = Question.objects.create(questionnaire=qn, question_text="x", question_type="rating_scale", order=1)
+        self.assertEqual(q.concern_direction, "higher")
+        self.assertEqual(q.concern_options, [])
+
+
 class AssessmentFieldsTest(TestCase):
     def test_assessment_has_questionnaire_notes_classification(self):
         from django.contrib.auth import get_user_model

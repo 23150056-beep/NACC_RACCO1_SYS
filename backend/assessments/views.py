@@ -7,10 +7,11 @@ from accounts.models import Role
 from accounts.permissions import CanManageInstruments, CanTakeAssessments
 from activity.models import ActivityLog
 from activity.services import log_activity
-from assessments.models import Questionnaire, Assessment
+from assessments.models import Questionnaire, Assessment, AssessmentResult, Recommendation
 from assessments.serializers import (
     QuestionnaireSerializer, AssessmentWriteSerializer, AssessmentListSerializer,
 )
+from assessments.analysis import scoring, recommendations
 from assessments.extraction.base import ExtractionError
 from assessments.extraction.ocr_heuristic import OcrHeuristicExtractor
 
@@ -103,5 +104,32 @@ class AssessmentViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         assessment = serializer.save(psychologist=self.request.user, status="completed")
+        self._persist_analysis(assessment)
         log_activity(self.request.user, ActivityLog.CREATED, ActivityLog.RECORD,
                      entity_type="Assessment", entity_label=assessment.child.fullname, entity_id=assessment.id)
+
+    def _persist_analysis(self, assessment):
+        if not assessment.questionnaire_id:
+            return
+        responses = [{"question": r.question_id, "answer": r.answer} for r in assessment.responses.all()]
+        result = scoring.score(assessment.questionnaire, responses)
+        rec = recommendations.recommend(result)
+        ar = AssessmentResult.objects.create(
+            assessment=assessment,
+            behavioral_score=result["behavioral_score"],
+            classification=result["classification"],
+            assessment_date=assessment.assessment_date,
+            assessment_type=assessment.assessment_type,
+        )
+        Recommendation.objects.create(
+            result=ar, recommendation_text=rec["recommendation_text"], priority_level=rec["priority_level"])
+
+    @action(detail=False, methods=["post"])
+    def analyze(self, request):
+        try:
+            questionnaire = Questionnaire.objects.get(pk=request.data.get("questionnaire"))
+        except Questionnaire.DoesNotExist:
+            return Response({"detail": "Questionnaire not found."}, status=status.HTTP_400_BAD_REQUEST)
+        result = scoring.score(questionnaire, request.data.get("responses", []))
+        rec = recommendations.recommend(result)
+        return Response({**result, **rec}, status=status.HTTP_200_OK)

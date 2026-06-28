@@ -1,13 +1,15 @@
 from rest_framework import serializers
-from assessments.models import Questionnaire, Question, Assessment, Response
+from assessments.models import Questionnaire, Question, Assessment, Response, AssessmentResult
 
 
 class QuestionSerializer(serializers.ModelSerializer):
     options = serializers.JSONField(required=False, default=list)
+    concern_options = serializers.JSONField(required=False, default=list)
 
     class Meta:
         model = Question
-        fields = ["id", "question_text", "question_type", "options", "order"]
+        fields = ["id", "question_text", "question_type", "options", "order",
+                  "concern_direction", "concern_options"]
 
 
 class QuestionnaireSerializer(serializers.ModelSerializer):
@@ -71,3 +73,24 @@ class AssessmentListSerializer(serializers.ModelSerializer):
         model = Assessment
         fields = ["id", "child", "child_name", "questionnaire", "questionnaire_title",
                   "psychologist_name", "assessment_type", "classification", "status", "assessment_date"]
+
+
+class AssessmentResultSerializer(serializers.ModelSerializer):
+    priority_level = serializers.SerializerMethodField()
+    recommendation_text = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AssessmentResult
+        fields = ["behavioral_score", "classification", "generated_date",
+                  "priority_level", "recommendation_text"]
+
+    def _first_rec(self, obj):
+        return obj.recommendations.first()
+
+    def get_priority_level(self, obj):
+        rec = self._first_rec(obj)
+        return rec.priority_level if rec else ""
+
+    def get_recommendation_text(self, obj):
+        rec = self._first_rec(obj)
+        return rec.recommendation_text if rec else ""

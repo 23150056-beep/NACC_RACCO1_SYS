@@ -184,3 +184,28 @@ class AssessmentTakingTest(APITestCase):
         payload["respondent_mode"] = "child"
         self.client.post("/api/assessments/", payload, format="json")
         self.assertEqual(Assessment.objects.get().respondent_mode, "child")
+
+    def test_analyze_returns_result_without_saving(self):
+        from assessments.models import AssessmentResult
+        self._auth("p@racco1.gov.ph")
+        resp = self.client.post("/api/assessments/analyze/", {
+            "questionnaire": self.qn.id,
+            "responses": [{"question": self.q1.id, "answer": "No"}, {"question": self.q2.id, "answer": "5"}],
+        }, format="json")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("behavioral_score", resp.data)
+        self.assertIn("recommendation_text", resp.data)
+        self.assertEqual(AssessmentResult.objects.count(), 0)
+
+    def test_analyze_forbidden_for_staff(self):
+        self._auth("s@racco1.gov.ph")
+        resp = self.client.post("/api/assessments/analyze/", {"questionnaire": self.qn.id, "responses": []}, format="json")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_submit_persists_result_and_recommendation(self):
+        from assessments.models import AssessmentResult, Recommendation
+        self._auth("p@racco1.gov.ph")
+        self.client.post("/api/assessments/", self._assessment_payload(), format="json")
+        self.assertEqual(AssessmentResult.objects.count(), 1)
+        self.assertEqual(Recommendation.objects.count(), 1)
+        self.assertTrue(AssessmentResult.objects.first().classification)
