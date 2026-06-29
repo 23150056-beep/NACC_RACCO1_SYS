@@ -43,7 +43,7 @@ export default function Login() {
               In The Best Interests<br />of the Child
             </div>
             <p style={{ marginTop: 12, fontSize: 14, opacity: 0.85, lineHeight: 1.6, maxWidth: 320 }}>
-              Behavioral Assessment &amp; Counseling Support System for the National Authority for Child Care.
+              Behavioral Assessment &amp; Counseling Support System
             </p>
           </div>
         </div>
