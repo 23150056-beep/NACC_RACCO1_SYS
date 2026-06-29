@@ -21,9 +21,9 @@ def confidence_for(coverage, behavioral):
 def classify(score):
     if score is None:
         return NEEDS_MONITORING
-    if score < 34:
+    if score < BOUNDARY_LOW:
         return NORMAL
-    if score < 67:
+    if score < BOUNDARY_HIGH:
         return NEEDS_MONITORING
     return NEEDS_ATTENTION
 
