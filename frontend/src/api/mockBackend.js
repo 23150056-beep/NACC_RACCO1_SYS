@@ -1,6 +1,6 @@
 // In-browser mock of the Django API for the static GitHub Pages demo.
 // Activated only when VITE_DEMO_MODE === 'true' (see api/client.js).
-const KEY = 'nacc_demo_db_v2';
+const KEY = 'nacc_demo_db_v3';
 
 const mkUser = (id, email, first, last, role, role_name) => ({
   id, email, username: email.split('@')[0], first_name: first, last_name: last,
@@ -50,7 +50,8 @@ function seed() {
     { id: 41, actor_label: 'System Administrator', action: 'created', category: 'user', entity_type: 'User', entity_label: 'Maria Cruz', entity_id: 2, created_at: new Date(Date.now() - 3600e3).toISOString() },
     { id: 42, actor_label: 'Maria Cruz', action: 'login', category: 'security', entity_type: '', entity_label: '', entity_id: null, created_at: new Date(Date.now() - 1800e3).toISOString() },
   ];
-  return { seq: 1000, roles, users, guardians, children, questionnaires, assessments: [], activity };
+  return { seq: 1000, roles, users, guardians, children, questionnaires, assessments: [], activity,
+           settings: { min_confidence_threshold: 80, require_override_on_low_confidence: true } };
 }
 
 let db = load();
@@ -110,11 +111,19 @@ function scoreQ(questionnaire, responses) {
     items.push([qq, c]);
   });
   const total = (questionnaire.questions || []).length;
-  if (!items.length) return { behavioral_score: null, classification: 'Needs Monitoring', scored_count: 0, total_count: total, top_concerns: [] };
+  if (!items.length) return { behavioral_score: null, classification: 'Needs Monitoring', scored_count: 0, total_count: total, top_concerns: [], confidence: 0 };
   const score = Math.round((items.reduce((s, [, c]) => s + c, 0) / items.length) * 100 * 100) / 100;
   const classification = score < 34 ? 'Normal' : score < 67 ? 'Needs Monitoring' : 'Needs Counseling Attention';
   const top = items.filter(([, c]) => c >= 0.5).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([qq]) => qq.question_text);
-  return { behavioral_score: score, classification, scored_count: items.length, total_count: total, top_concerns: top };
+  const coverage = total ? items.length / total : 0;
+  return { behavioral_score: score, classification, scored_count: items.length, total_count: total, top_concerns: top, confidence: confidenceFor(coverage, score) };
+}
+const BOUNDARY_LOW = 34, BOUNDARY_HIGH = 67, BOUNDARY_MARGIN = 15, W_COV = 0.5, W_DEC = 0.5;
+function confidenceFor(coverage, behavioral) {
+  if (behavioral == null) return 0;
+  const margin = Math.min(Math.abs(behavioral - BOUNDARY_LOW), Math.abs(behavioral - BOUNDARY_HIGH));
+  const decisiveness = Math.min(margin / BOUNDARY_MARGIN, 1);
+  return Math.round(100 * (W_COV * coverage + W_DEC * decisiveness));
 }
 const REC_TEMPLATES = {
   'Normal': ['Low', 'The child appears to be adjusting well; responses show no significant behavioral concerns.', 'continue routine periodic check-ins'],
@@ -213,23 +222,35 @@ function handle(method, url, body, config) {
   }
 
   // --- assessments / activity ---
+  if (url === '/analysis-settings/' && method === 'get') return ok(db.settings);
+  if (url === '/analysis-settings/' && method === 'put') {
+    if (!actor || actor.role_name !== 'Administrator') return ok({ detail: 'Admin only' }, 403);
+    db.settings = { min_confidence_threshold: Number(body.min_confidence_threshold), require_override_on_low_confidence: !!body.require_override_on_low_confidence };
+    save();
+    return ok(db.settings);
+  }
   if (url === '/assessments/analyze/' && method === 'post') {
     const qn = db.questionnaires.find((x) => x.id === Number(body.questionnaire));
     const result = scoreQ(qn || { questions: [] }, body.responses || []);
-    return ok({ ...result, ...recommend(result) });
+    const flagged = db.settings.require_override_on_low_confidence && result.confidence < db.settings.min_confidence_threshold;
+    return ok({ ...result, ...recommend(result), min_confidence_threshold: db.settings.min_confidence_threshold, require_override: db.settings.require_override_on_low_confidence, flagged });
   }
   if (url === '/assessments/' && method === 'post') {
     const qn = db.questionnaires.find((x) => x.id === Number(body.questionnaire));
     const c = db.children.find((x) => x.id === Number(body.child));
     const result = scoreQ(qn || { questions: [] }, body.responses || []);
     const rec = recommend(result);
+    const flagged = db.settings.require_override_on_low_confidence && result.confidence < db.settings.min_confidence_threshold;
+    if (flagged && !body.override_acknowledged) {
+      return ok({ detail: 'Below confidence threshold; override required.', code: 'override_required', confidence: result.confidence, threshold: db.settings.min_confidence_threshold }, 400);
+    }
     const a = {
       id: nextId(), child: body.child, child_name: c?.fullname || '', child_case_type: c?.case_type || '',
       questionnaire: body.questionnaire, questionnaire_title: qn?.title || '', assessment_type: body.assessment_type || '',
       classification: body.classification || '', notes: body.notes || '', respondent_mode: body.respondent_mode || 'staff',
       psychologist: actor?.id, psychologist_name: actor?.fullname || '', status: 'completed',
       assessment_date: new Date().toISOString().slice(0, 10),
-      result: { behavioral_score: result.behavioral_score, classification: result.classification, generated_date: new Date().toISOString(), priority_level: rec.priority_level, recommendation_text: rec.recommendation_text },
+      result: { behavioral_score: result.behavioral_score, classification: result.classification, generated_date: new Date().toISOString(), priority_level: rec.priority_level, recommendation_text: rec.recommendation_text, confidence: result.confidence, overridden: flagged },
     };
     db.assessments.unshift(a);
     logActivity('created', 'record', 'Assessment', c?.fullname || 'child', a.id);
