@@ -67,3 +67,20 @@ class AssessmentFieldsTest(TestCase):
         self.assertEqual(a.questionnaire, qn)
         self.assertEqual(a.notes, "Calm.")
         self.assertEqual(a.classification, "Normal Development")
+
+
+class AnalysisSettingTest(TestCase):
+    def test_load_returns_singleton_with_defaults(self):
+        from assessments.models import AnalysisSetting
+        s = AnalysisSetting.load()
+        self.assertEqual(s.pk, 1)
+        self.assertEqual(s.min_confidence_threshold, 80)
+        self.assertTrue(s.require_override_on_low_confidence)
+
+    def test_save_always_pins_pk_one(self):
+        from assessments.models import AnalysisSetting
+        s = AnalysisSetting.load()
+        s.min_confidence_threshold = 70
+        s.save()
+        self.assertEqual(AnalysisSetting.objects.count(), 1)
+        self.assertEqual(AnalysisSetting.load().min_confidence_threshold, 70)

@@ -93,3 +93,22 @@ class Recommendation(models.Model):
 
     class Meta:
         db_table = "tbl_recommendation"
+
+
+class AnalysisSetting(models.Model):
+    """Singleton (pk=1) holding the AI-engine gate configuration."""
+    min_confidence_threshold = models.PositiveSmallIntegerField(default=80)
+    require_override_on_low_confidence = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "tbl_analysis_setting"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
