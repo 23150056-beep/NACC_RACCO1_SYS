@@ -123,7 +123,7 @@
   --border: var(--ink-200);
   --border-strong: var(--ink-300);
   --border-brand: var(--blue-200);
-  --ring: color-mix(in srgb, var(--blue-500) 45%, transparent);
+  --ring: color-mix(in srgb, var(--blue-500) 22%, transparent);
 
   /* Role accent chips */
   --role-admin: var(--blue-600);

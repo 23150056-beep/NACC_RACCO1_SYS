@@ -285,7 +285,7 @@ export function Input({ value, onChange, placeholder, type = 'text', size = 'md'
       <input
         type={type} value={value} onChange={onChange} placeholder={placeholder} disabled={disabled}
         onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
-        style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontFamily: 'var(--font-sans)', fontSize: size === 'sm' ? 13 : 15, color: 'var(--text-strong)', height: '100%' }}
+        style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', boxShadow: 'none', background: 'transparent', fontFamily: 'var(--font-sans)', fontSize: size === 'sm' ? 13 : 15, color: 'var(--text-strong)', height: '100%' }}
         {...rest}
       />
       {trailing && <span style={{ display: 'inline-flex', color: 'var(--text-faint)', flex: 'none' }}>{trailing}</span>}
