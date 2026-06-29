@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from assessments.models import Questionnaire, Question, Assessment, Response, AssessmentResult
+from assessments.models import Questionnaire, Question, Assessment, Response, AssessmentResult, AnalysisSetting
 
 
 class QuestionSerializer(serializers.ModelSerializer):
@@ -101,3 +101,14 @@ class AssessmentResultSerializer(serializers.ModelSerializer):
     def get_recommendation_text(self, obj):
         rec = self._first_rec(obj)
         return rec.recommendation_text if rec else ""
+
+
+class AnalysisSettingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AnalysisSetting
+        fields = ["min_confidence_threshold", "require_override_on_low_confidence"]
+
+    def validate_min_confidence_threshold(self, value):
+        if value < 50 or value > 99:
+            raise serializers.ValidationError("Threshold must be between 50 and 99.")
+        return value

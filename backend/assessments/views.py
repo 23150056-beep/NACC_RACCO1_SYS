@@ -1,15 +1,17 @@
 from rest_framework import generics, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from accounts.models import Role
-from accounts.permissions import CanManageInstruments, CanTakeAssessments, CanViewResults
+from accounts.permissions import CanManageInstruments, CanTakeAssessments, CanViewResults, IsAdministrator
 from activity.models import ActivityLog
 from activity.services import log_activity
-from assessments.models import Questionnaire, Assessment, AssessmentResult, Recommendation
+from assessments.models import Questionnaire, Assessment, AssessmentResult, Recommendation, AnalysisSetting
 from assessments.serializers import (
     QuestionnaireSerializer, AssessmentWriteSerializer, AssessmentListSerializer,
+    AnalysisSettingSerializer,
 )
 from assessments.analysis import scoring, recommendations
 from assessments.extraction.base import ExtractionError
@@ -140,3 +142,15 @@ class AssessmentViewSet(viewsets.ModelViewSet):
         result = scoring.score(questionnaire, request.data.get("responses", []))
         rec = recommendations.recommend(result)
         return Response({**result, **rec}, status=status.HTTP_200_OK)
+
+
+class AnalysisSettingView(generics.RetrieveUpdateAPIView):
+    serializer_class = AnalysisSettingSerializer
+
+    def get_permissions(self):
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return [IsAuthenticated()]
+        return [IsAdministrator()]
+
+    def get_object(self):
+        return AnalysisSetting.load()

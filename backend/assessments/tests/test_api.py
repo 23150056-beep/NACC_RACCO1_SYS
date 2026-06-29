@@ -224,3 +224,41 @@ class AssessmentTakingTest(APITestCase):
         self.assertIsNotNone(resp.data[0]["result"])
         self.assertIn("behavioral_score", resp.data[0]["result"])
         self.assertIn("notes", resp.data[0])
+
+
+class AnalysisSettingApiTest(APITestCase):
+    def setUp(self):
+        self.admin_role = Role.objects.create(role_name=Role.ADMINISTRATOR)
+        self.psy_role = Role.objects.create(role_name=Role.PSYCHOLOGIST)
+        self.admin = User.objects.create_user(email="a@racco1.gov.ph", username="a", password="pass1234", role=self.admin_role)
+        self.psy = User.objects.create_user(email="p@racco1.gov.ph", username="p", password="pass1234", role=self.psy_role)
+
+    def _auth(self, email):
+        token = self.client.post("/api/auth/login/", {"email": email, "password": "pass1234"}).data["access"]
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer " + token)
+
+    def test_get_returns_defaults(self):
+        self._auth("p@racco1.gov.ph")
+        resp = self.client.get("/api/analysis-settings/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["min_confidence_threshold"], 80)
+        self.assertTrue(resp.data["require_override_on_low_confidence"])
+
+    def test_admin_can_update(self):
+        self._auth("a@racco1.gov.ph")
+        resp = self.client.put("/api/analysis-settings/", {
+            "min_confidence_threshold": 70, "require_override_on_low_confidence": False}, format="json")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["min_confidence_threshold"], 70)
+
+    def test_non_admin_cannot_update(self):
+        self._auth("p@racco1.gov.ph")
+        resp = self.client.put("/api/analysis-settings/", {
+            "min_confidence_threshold": 70, "require_override_on_low_confidence": True}, format="json")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_threshold_out_of_range_rejected(self):
+        self._auth("a@racco1.gov.ph")
+        resp = self.client.put("/api/analysis-settings/", {
+            "min_confidence_threshold": 10, "require_override_on_low_confidence": True}, format="json")
+        self.assertEqual(resp.status_code, 400)

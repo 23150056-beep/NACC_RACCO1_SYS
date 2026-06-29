@@ -1,6 +1,6 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
-from assessments.views import QuestionnaireViewSet, AssessmentViewSet, ActiveQuestionnaireListView
+from assessments.views import QuestionnaireViewSet, AssessmentViewSet, ActiveQuestionnaireListView, AnalysisSettingView
 
 router = DefaultRouter()
 router.register("questionnaires", QuestionnaireViewSet, basename="questionnaire")
@@ -8,4 +8,5 @@ router.register("assessments", AssessmentViewSet, basename="assessment")
 
 urlpatterns = router.urls + [
     path("active-questionnaires/", ActiveQuestionnaireListView.as_view(), name="active-questionnaires"),
+    path("analysis-settings/", AnalysisSettingView.as_view(), name="analysis-settings"),
 ]
