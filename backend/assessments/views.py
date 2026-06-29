@@ -111,6 +111,30 @@ class AssessmentViewSet(viewsets.ModelViewSet):
             return AssessmentWriteSerializer
         return AssessmentListSerializer
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        questionnaire = serializer.validated_data.get("questionnaire")
+        setting = AnalysisSetting.load()
+        confidence, flagged = 0, False
+        if questionnaire is not None:
+            responses = [{"question": r["question"].id, "answer": r.get("answer", "")}
+                         for r in serializer.validated_data.get("responses", [])]
+            confidence = scoring.score(questionnaire, responses)["confidence"]
+            flagged = (setting.require_override_on_low_confidence
+                       and confidence < setting.min_confidence_threshold)
+        if flagged and not request.data.get("override_acknowledged"):
+            return Response({
+                "detail": "This result is below the minimum confidence threshold and requires practitioner override.",
+                "code": "override_required",
+                "confidence": confidence,
+                "threshold": setting.min_confidence_threshold,
+            }, status=status.HTTP_400_BAD_REQUEST)
+        self._overridden = flagged
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
     def perform_create(self, serializer):
         assessment = serializer.save(psychologist=self.request.user, status="completed")
         self._persist_analysis(assessment)
@@ -127,6 +151,8 @@ class AssessmentViewSet(viewsets.ModelViewSet):
             assessment=assessment,
             behavioral_score=result["behavioral_score"],
             classification=result["classification"],
+            confidence=result["confidence"],
+            overridden=getattr(self, "_overridden", False),
             assessment_date=assessment.assessment_date,
             assessment_type=assessment.assessment_type,
         )
@@ -141,7 +167,15 @@ class AssessmentViewSet(viewsets.ModelViewSet):
             return Response({"detail": "Questionnaire not found."}, status=status.HTTP_400_BAD_REQUEST)
         result = scoring.score(questionnaire, request.data.get("responses", []))
         rec = recommendations.recommend(result)
-        return Response({**result, **rec}, status=status.HTTP_200_OK)
+        setting = AnalysisSetting.load()
+        flagged = (setting.require_override_on_low_confidence
+                   and result["confidence"] < setting.min_confidence_threshold)
+        return Response({
+            **result, **rec,
+            "min_confidence_threshold": setting.min_confidence_threshold,
+            "require_override": setting.require_override_on_low_confidence,
+            "flagged": flagged,
+        }, status=status.HTTP_200_OK)
 
 
 class AnalysisSettingView(generics.RetrieveUpdateAPIView):

@@ -225,6 +225,64 @@ class AssessmentTakingTest(APITestCase):
         self.assertIn("behavioral_score", resp.data[0]["result"])
         self.assertIn("notes", resp.data[0])
 
+    def _low_conf_payload(self):
+        # q1 scorable ("Yes" -> concern 1.0); q2 blank -> unscorable.
+        # coverage 1/2, score 100 -> confidence round(100*(0.5*0.5 + 0.5*1.0)) = 75 -> below 80.
+        return {
+            "child": self.child.id, "questionnaire": self.qn.id, "assessment_type": "Intake",
+            "classification": "Normal Development", "notes": "Limited data.",
+            "responses": [
+                {"question": self.q1.id, "answer": "Yes"},
+                {"question": self.q2.id, "answer": ""},
+            ],
+        }
+
+    def test_low_confidence_blocked_without_override(self):
+        self._auth("p@racco1.gov.ph")
+        resp = self.client.post("/api/assessments/", self._low_conf_payload(), format="json")
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.data["code"], "override_required")
+        self.assertEqual(resp.data["confidence"], 75)
+        self.assertEqual(Assessment.objects.count(), 0)
+
+    def test_low_confidence_saved_with_override(self):
+        from assessments.models import AssessmentResult
+        self._auth("p@racco1.gov.ph")
+        payload = self._low_conf_payload()
+        payload["override_acknowledged"] = True
+        resp = self.client.post("/api/assessments/", payload, format="json")
+        self.assertEqual(resp.status_code, 201)
+        ar = AssessmentResult.objects.get()
+        self.assertTrue(ar.overridden)
+        self.assertEqual(ar.confidence, 75)
+
+    def test_high_confidence_not_gated(self):
+        from assessments.models import AssessmentResult
+        self._auth("p@racco1.gov.ph")
+        resp = self.client.post("/api/assessments/", self._assessment_payload(), format="json")
+        self.assertEqual(resp.status_code, 201)
+        self.assertFalse(AssessmentResult.objects.get().overridden)
+
+    def test_gate_disabled_when_override_not_required(self):
+        from assessments.models import AnalysisSetting
+        s = AnalysisSetting.load()
+        s.require_override_on_low_confidence = False
+        s.save()
+        self._auth("p@racco1.gov.ph")
+        resp = self.client.post("/api/assessments/", self._low_conf_payload(), format="json")
+        self.assertEqual(resp.status_code, 201)
+
+    def test_analyze_returns_confidence_and_flag(self):
+        self._auth("p@racco1.gov.ph")
+        resp = self.client.post("/api/assessments/analyze/", {
+            "questionnaire": self.qn.id,
+            "responses": [{"question": self.q1.id, "answer": "Yes"}, {"question": self.q2.id, "answer": ""}],
+        }, format="json")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["confidence"], 75)
+        self.assertTrue(resp.data["flagged"])
+        self.assertEqual(resp.data["min_confidence_threshold"], 80)
+
 
 class AnalysisSettingApiTest(APITestCase):
     def setUp(self):
