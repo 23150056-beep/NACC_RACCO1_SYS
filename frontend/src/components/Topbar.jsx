@@ -6,11 +6,12 @@ import { useActivity } from '../context/ActivityContext';
 
 const SCREEN_TITLES = {
   '/': ['Dashboard', 'Regional overview of cases & activity'],
-  '/children': ['Children Records', 'Profiles, guardians & case status'],
-  '/assessment': ['Assessment Tools', 'Questionnaire, AI analysis & clinical notes'],
+  '/children': ['Records', 'Child profiles, assigned psychologist & case status'],
+  '/assessment': ['Assessment', 'Assessment instrument, AI analysis & clinical notes'],
+  '/questionnaires': ['Assessment Instruments', 'Build & manage assessment instruments'],
   '/report': ['Assessment Results', 'Shared counseling outcomes for continuity of care'],
   '/compliance': ['Compliance & Audit', 'Regulatory status & exportable records'],
-  '/users': ['User Management', 'Accounts, roles & access'],
+  '/users': ['User Management', 'Accounts & roles'],
   '/settings': ['System Settings', 'Agency configuration & AI engine'],
 };
 
@@ -44,15 +45,13 @@ export function timeAgo(iso) {
 }
 
 export default function Topbar() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const role = user?.role_name || 'Staff';
   const name = user?.fullname || user?.username || 'User';
   const [title, sub] = SCREEN_TITLES[location.pathname] || ['', ''];
 
-  const initialQ = new URLSearchParams(location.search).get('q') || '';
-  const [query, setQuery] = useState(initialQ);
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef(null);
   const { events, unreadCount, markSeen } = useActivity();
@@ -60,9 +59,7 @@ export default function Topbar() {
   const unread = unreadCount;
   const shownEvents = events.filter((e) => notifTab === 'all' || e.category === notifTab);
 
-  useEffect(() => {
-    if (location.pathname !== '/children') setQuery((q) => q); // keep box value across routes
-  }, [location.pathname]);
+  const handleLogout = () => { logout(); navigate('/login'); };
 
   useEffect(() => {
     if (!notifOpen) return;
@@ -73,32 +70,12 @@ export default function Topbar() {
     return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey); };
   }, [notifOpen]);
 
-  const runSearch = (v) => {
-    setQuery(v);
-    navigate(`/children${v ? `?q=${encodeURIComponent(v)}` : ''}`);
-  };
-
   return (
     <header style={{ height: 'var(--topbar-h)', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 16, padding: '0 26px', flex: 'none' }}>
-      <div style={{ flex: '0 1 auto', minWidth: 0, maxWidth: '38%' }}>
+      <div style={{ flex: '1 1 auto', minWidth: 0 }}>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 800, color: 'var(--text-strong)', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</h1>
         <div style={{ fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</div>
       </div>
-
-      <form role="search" onSubmit={(e) => { e.preventDefault(); runSearch(query); }} style={{ position: 'relative', flex: '1 1 auto', maxWidth: 380, margin: '0 auto' }}>
-        <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)', pointerEvents: 'none', display: 'inline-flex' }}><Icon name="search" size={16} /></span>
-        <input
-          value={query}
-          onChange={(e) => runSearch(e.target.value)}
-          onFocus={() => { if (location.pathname !== '/children') navigate('/children'); }}
-          placeholder="Search children by name or case ID…"
-          aria-label="Search children records"
-          style={{ width: '100%', height: 40, padding: '0 12px 0 36px', borderRadius: 'var(--radius-pill)', border: '1px solid var(--border)', background: 'var(--ink-50)', color: 'var(--text-strong)', fontFamily: 'var(--font-sans)', fontSize: 13.5 }}
-        />
-        {query && (
-          <button type="button" onClick={() => runSearch('')} aria-label="Clear search" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'var(--ink-200)', border: 'none', borderRadius: '50%', width: 20, height: 20, cursor: 'pointer', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="x" size={13} /></button>
-        )}
-      </form>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: '0 0 auto' }}>
         <div ref={notifRef} style={{ position: 'relative' }}>
@@ -157,6 +134,16 @@ export default function Topbar() {
             <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{role}</div>
           </div>
         </div>
+
+        <button
+          onClick={handleLogout} title="Log out" aria-label="Log out"
+          {...hoverLift({ lift: -1, shadow: 'var(--shadow-md)' })}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 40, padding: '0 13px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--ink-50)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 12.5, color: 'var(--text-body)', transition: 'var(--transition-base)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--red-500)'; e.currentTarget.style.borderColor = 'var(--red-200)'; e.currentTarget.style.background = 'var(--red-50)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-body)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--ink-50)'; }}
+        >
+          <Icon name="log-out" size={16} /> Log Out
+        </button>
       </div>
     </header>
   );

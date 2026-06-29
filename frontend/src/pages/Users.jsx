@@ -115,12 +115,22 @@ export default function Users() {
                   <Input value={form[k] || ''} onChange={(e) => setForm({ ...form, [k]: e.target.value })} type={k === 'email' ? 'email' : 'text'} />
                 </FormField>
               ))}
-              <FormField label="Role">
-                <Select value={form.role || ''} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                  <option value="">— Select role —</option>
-                  {roles.map((r) => <option key={r.id} value={r.id}>{r.role_name}</option>)}
-                </Select>
-              </FormField>
+              {/* A role cannot be changed once assigned (adviser). */}
+              {form.id && form.role ? (
+                <FormField label="Role" hint="A role cannot be changed once it has been assigned.">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 42, padding: '0 13px', borderRadius: 'var(--radius-md)', background: 'var(--ink-50)', border: '1px solid var(--border)', color: 'var(--text-strong)', fontWeight: 700, fontSize: 14 }}>
+                    {form.role_name || roles.find((r) => String(r.id) === String(form.role))?.role_name || '—'}
+                    <Icon name="lock" size={13} style={{ color: 'var(--text-faint)', marginLeft: 'auto' }} />
+                  </div>
+                </FormField>
+              ) : (
+                <FormField label="Role">
+                  <Select value={form.role || ''} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+                    <option value="">— Select role —</option>
+                    {roles.map((r) => <option key={r.id} value={r.id}>{r.role_name}</option>)}
+                  </Select>
+                </FormField>
+              )}
               <FormField label={form.id ? 'Password (leave blank to keep)' : 'Password'}>
                 <Input type="password" value={form.password || ''} onChange={(e) => setForm({ ...form, password: e.target.value })} />
               </FormField>

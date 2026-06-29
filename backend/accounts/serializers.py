@@ -46,6 +46,9 @@ class UserWriteSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         password = validated_data.pop("password", None)
+        # A role cannot be changed once it has been assigned (adviser).
+        if instance.role_id is not None:
+            validated_data.pop("role", None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         if password:

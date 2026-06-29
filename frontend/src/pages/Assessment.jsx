@@ -9,6 +9,16 @@ function caseRef(id) { return `C-${String(id).padStart(4, '0')}`; }
 
 const CLASSIFICATIONS = ['Trauma / Stressor-related', 'Behavioral / Conduct', 'Adjustment Disorder', 'Normal Development'];
 
+// Adviser: automatically determine Session Type from the assessment instrument.
+// Heuristic on the instrument's title/description until a dedicated field exists.
+function deriveSessionType(form) {
+  if (!form) return 'Intake / Baseline';
+  const t = `${form.title || ''} ${form.description || ''}`.toLowerCase();
+  if (/(incident|crisis|trauma|follow.?up|abuse)/.test(t)) return 'Incident Follow-up';
+  if (/(check.?in|monitor|wellbeing|emotion|routine|weekly|monthly)/.test(t)) return 'Regular Check-in';
+  return 'Intake / Baseline';
+}
+
 export default function Assessment() {
   const { refresh: refreshActivity } = useActivity();
   const toast = useToast();
@@ -89,7 +99,7 @@ export default function Assessment() {
       <div style={{ maxWidth: 760, margin: '0 auto' }}>
         <Card padding="28px">
           <div style={{ marginBottom: 26 }}>
-            <ProgressSteps steps={['Select Child', 'Questionnaire', 'Responses', 'Review & Sign']} current={step} />
+            <ProgressSteps steps={['Select Child', 'Instrument', 'Responses', 'Review & Sign']} current={step} />
           </div>
 
           {step === 1 && (
@@ -97,7 +107,7 @@ export default function Assessment() {
               <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 700, marginBottom: 4 }}>Select a child for assessment</h2>
               <p style={{ fontSize: 13.5, color: 'var(--text-muted)', marginBottom: 18 }}>Children with an active record appear here.</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {children.length === 0 && <Alert tone="info" icon={<Icon name="info" size={18} />}>No child records available yet. Add children under Children Records first.</Alert>}
+                {children.length === 0 && <Alert tone="info" icon={<Icon name="info" size={18} />}>No child records available yet. Add children under Records first.</Alert>}
                 {children.map((c) => (
                   <button key={c.id} onClick={() => setChild(String(c.id))} {...hoverLift()} style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '13px 15px', textAlign: 'left', cursor: 'pointer', borderRadius: 'var(--radius-lg)', background: String(child) === String(c.id) ? 'var(--blue-50)' : 'var(--surface)', border: `1.5px solid ${String(child) === String(c.id) ? 'var(--blue-500)' : 'var(--border)'}`, transition: 'var(--transition-base)' }}>
                     <span style={{ width: 38, height: 38, borderRadius: 'var(--radius-md)', background: 'var(--ink-100)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', flex: 'none' }}><Icon name="user" size={19} /></span>
@@ -113,21 +123,22 @@ export default function Assessment() {
 
           {step === 2 && (
             <div>
-              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 700, marginBottom: 18 }}>Choose a questionnaire</h2>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 700, marginBottom: 18 }}>Choose an assessment instrument</h2>
               {forms.length === 0
-                ? <Alert tone="warning" icon={<Icon name="alert-triangle" size={18} />}>No published questionnaires yet. Create and publish one under <strong>Assessment Instruments</strong> first.</Alert>
+                ? <Alert tone="warning" icon={<Icon name="alert-triangle" size={18} />}>No published instruments yet. Create and publish one under <strong>Assessment Instruments</strong> first.</Alert>
                 : (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
-                    <FormField label="Instrument">
-                      <Select value={formId} onChange={(e) => { setFormId(e.target.value); setAnswers({}); }}>
+                    <FormField label="Assessment Instrument">
+                      <Select value={formId} onChange={(e) => { const f = forms.find((x) => String(x.id) === e.target.value); setFormId(e.target.value); setAnswers({}); setStype(deriveSessionType(f)); }}>
                         <option value="">— Select —</option>
                         {forms.map((f) => <option key={f.id} value={f.id}>{f.title}{f.age_group ? ` (${f.age_group})` : ''}</option>)}
                       </Select>
                     </FormField>
-                    <FormField label="Session Type">
-                      <Select value={stype} onChange={(e) => setStype(e.target.value)}>
-                        <option>Intake / Baseline</option><option>Regular Check-in</option><option>Incident Follow-up</option>
-                      </Select>
+                    <FormField label="Session Type" hint="Determined automatically from the instrument.">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 42, padding: '0 13px', borderRadius: 'var(--radius-md)', background: 'var(--ink-50)', border: '1px solid var(--border)', color: 'var(--text-strong)', fontWeight: 700, fontSize: 14 }}>
+                        <Icon name="sparkles" size={15} style={{ color: 'var(--blue-600)' }} />
+                        {form ? stype : '—'}
+                      </div>
                     </FormField>
                   </div>
                 )}
@@ -139,7 +150,7 @@ export default function Assessment() {
             <div>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 18 }}>
                 <div>
-                  <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 700, marginBottom: 4 }}>{form?.title || 'Questionnaire'}</h2>
+                  <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 700, marginBottom: 4 }}>{form?.title || 'Instrument'}</h2>
                   <p style={{ fontSize: 13.5, color: 'var(--text-muted)' }}>Answer each item based on the session, or hand the device to the child.</p>
                 </div>
                 <Button variant="secondary" onClick={() => setKiosk(true)} iconLeft={<Icon name="smile" size={17} />}>Hand to child</Button>
@@ -249,7 +260,7 @@ function AnalysisPanel({ analyzing, analysis }) {
     <div style={{ background: analysis ? tone.bg : 'var(--ink-50)', border: `1px solid ${analysis ? tone.line : 'var(--border-strong)'}`, borderRadius: 'var(--radius-xl)', padding: 22, marginBottom: 18 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <Icon name="sparkles" size={18} style={{ color: analysis ? tone.fg : 'var(--text-faint)' }} />
-        <span style={{ fontWeight: 800, fontSize: 14, color: 'var(--text-strong)' }}>Automated analysis</span>
+        <span style={{ fontWeight: 800, fontSize: 14, color: 'var(--text-strong)' }}>AI-generated assessment summary</span>
       </div>
       {analyzing && <p style={{ fontSize: 13.5, color: 'var(--text-muted)', margin: 0 }}>Analyzing responses…</p>}
       {!analyzing && !analysis && <p style={{ fontSize: 13.5, color: 'var(--text-faint)', margin: 0 }}>Analysis unavailable — record your clinical judgment below.</p>}

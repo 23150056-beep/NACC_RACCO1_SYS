@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useActivity } from '../context/ActivityContext';
 import { Card, Button, Badge, Input, Select, FormField, Avatar, SeverityBadge, Alert, EmptyState, Icon, iconBtn, hoverLift, PAGE } from '../ui';
 import { useToast } from '../context/ToastContext';
+import { CASE_TYPES, SURRENDERED_BY, PROVINCES, MUNICIPALITIES, BARANGAYS } from '../config/caseData';
 
 // NOTE: clinical severity is not yet tracked on the backend (Child.status is the
 // active/archived soft-delete flag). Until assessments are wired, we derive a
@@ -20,11 +21,18 @@ function ageFrom(birth) {
   const diff = Date.now() - d.getTime();
   return Math.max(0, Math.floor(diff / (365.25 * 24 * 3600 * 1000)));
 }
+// Adviser-optimized age groups: Child 1-12, Teen 13-17.
+function ageGroup(age) {
+  if (age == null) return null;
+  if (age <= 12) return 'Child';
+  if (age <= 17) return 'Teen';
+  return 'Adult';
+}
 function caseRef(id) {
   return `C-${String(id).padStart(4, '0')}`;
 }
 
-const EMPTY = { fullname: '', birth_date: '', gender: '', address: '', case_type: '', guardian: '' };
+const EMPTY = { fullname: '', birth_date: '', gender: '', province: '', municipality: '', barangay: '', case_type: '', surrendered_by: '', psychologist: '' };
 
 export default function Children() {
   const { user } = useAuth();
@@ -32,7 +40,7 @@ export default function Children() {
   const toast = useToast();
   const canManage = ['Administrator', 'Staff'].includes(user?.role_name);
   const [children, setChildren] = useState([]);
-  const [guardians, setGuardians] = useState([]);
+  const [psychologists, setPsychologists] = useState([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const q = searchParams.get('q') || '';
   const [status, setStatus] = useState('all');
@@ -42,7 +50,8 @@ export default function Children() {
 
   const load = () => {
     api.get('/children/').then((r) => setChildren(r.data));
-    api.get('/guardians/').then((r) => setGuardians(r.data));
+    // Only psychologists can be assigned to a record (adviser: replace Guardian).
+    api.get('/users/').then((r) => setPsychologists(r.data.filter((u) => u.role_name === 'Psychologist')));
   };
   useEffect(() => { load(); }, []);
 
@@ -52,15 +61,18 @@ export default function Children() {
     ...c,
     severity: deriveSeverity(c.id),
     age: ageFrom(c.birth_date),
+    group: ageGroup(ageFrom(c.birth_date)),
     ref: caseRef(c.id),
   })), [children]);
 
   const counts = { all: rows.length, high: 0, moderate: 0, standard: 0 };
   rows.forEach((c) => { counts[c.severity] = (counts[c.severity] || 0) + 1; });
 
+  // Adviser: improve alphabetical sorting throughout the system.
   const visible = rows
     .filter((c) => c.fullname.toLowerCase().includes(q.toLowerCase()) || c.ref.toLowerCase().includes(q.toLowerCase()))
-    .filter((c) => status === 'all' || c.severity === status);
+    .filter((c) => status === 'all' || c.severity === status)
+    .sort((a, b) => a.fullname.localeCompare(b.fullname, undefined, { sensitivity: 'base' }));
 
   const STATUS_FILTERS = [
     { key: 'all', label: 'All' }, { key: 'high', label: 'High' },
@@ -70,19 +82,19 @@ export default function Children() {
   const td = { padding: '11px 16px', fontSize: 13, color: 'var(--text-body)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
 
   const openCreate = () => { setError(''); setForm({ ...EMPTY }); };
-  const openEdit = (c) => { setError(''); setForm({ ...EMPTY, ...c, guardian: c.guardian || '' }); };
+  const openEdit = (c) => { setError(''); setForm({ ...EMPTY, ...c, psychologist: c.psychologist || '' }); };
 
   const save = async (e) => {
     e.preventDefault();
     setError('');
     const payload = { ...form };
-    delete payload.severity; delete payload.age; delete payload.ref; delete payload.guardian_name;
-    if (!payload.guardian) payload.guardian = null;
+    delete payload.severity; delete payload.age; delete payload.group; delete payload.ref; delete payload.psychologist_name; delete payload.guardian_name;
+    if (!payload.psychologist) payload.psychologist = null;
     if (!payload.birth_date) delete payload.birth_date;
     try {
       if (form.id) await api.put(`/children/${form.id}/`, payload);
       else await api.post('/children/', payload);
-      toast.success(form.id ? 'Child record updated' : 'Child record added');
+      toast.success(form.id ? 'Record updated' : 'Record added');
       setForm(null);
       load();
       refreshActivity();
@@ -112,7 +124,7 @@ export default function Children() {
           <Input placeholder="Search by name or case ID…" value={q} onChange={(e) => setQ(e.target.value)} leading={<Icon name="search" size={16} />} />
         </div>
         {canManage
-          ? <Button variant="primary" onClick={openCreate} iconLeft={<Icon name="plus" size={17} />}>Add Child</Button>
+          ? <Button variant="primary" onClick={openCreate} iconLeft={<Icon name="plus" size={17} />}>Add Record</Button>
           : <Badge tone="neutral" dot>Read-only for {user?.role_name}s</Badge>}
       </div>
 
@@ -142,7 +154,7 @@ export default function Children() {
             <table style={{ width: '100%', minWidth: 720, borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--ink-50)', borderBottom: '1px solid var(--border)' }}>
-                  {['Child', 'Gender / Age', 'Case Type', 'Guardian', 'Status', canManage ? 'Actions' : ''].filter(Boolean).map((h) => (
+                  {['Child', 'Gender / Age', 'Case Type', 'Psychologist', 'Status', canManage ? 'Actions' : ''].filter(Boolean).map((h) => (
                     <th key={h} scope="col" style={{ textAlign: 'left', padding: '11px 16px', fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -162,9 +174,9 @@ export default function Children() {
                         </div>
                       </div>
                     </td>
-                    <td style={td}>{c.gender || '—'} {c.age != null ? `· ${c.age}` : ''}</td>
+                    <td style={td}>{c.gender || '—'} {c.age != null ? `· ${c.age} (${c.group})` : ''}</td>
                     <td style={td}>{c.case_type || '—'}</td>
-                    <td style={td}>{c.guardian_name || '—'}</td>
+                    <td style={td}>{c.psychologist_name || '—'}</td>
                     <td style={{ padding: '11px 16px' }}><SeverityBadge level={c.severity} size="sm" /></td>
                     {canManage && (
                       <td style={{ padding: '11px 16px' }} onClick={(e) => e.stopPropagation()}>
@@ -183,7 +195,7 @@ export default function Children() {
       </Card>
 
       {sel && <ChildDrawer child={sel} canManage={canManage} onEdit={() => { openEdit(sel); setSel(null); }} onArchive={() => archive(sel)} onClose={() => setSel(null)} />}
-      {form && <ChildForm form={form} setForm={setForm} guardians={guardians} error={error} onSubmit={save} onClose={() => setForm(null)} />}
+      {form && <ChildForm form={form} setForm={setForm} psychologists={psychologists} error={error} onSubmit={save} onClose={() => setForm(null)} />}
     </div>
   );
 }
@@ -194,12 +206,14 @@ function ChildDrawer({ child, canManage, onEdit, onArchive, onClose }) {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
+  const location = [child.barangay, child.municipality, child.province].filter(Boolean).join(', ') || child.address || '—';
   const fields = [
     ['Gender', child.gender || '—'],
-    ['Age', child.age != null ? `${child.age} years old` : '—'],
+    ['Age', child.age != null ? `${child.age} years old (${child.group})` : '—'],
     ['Case Type', child.case_type || '—'],
-    ['Guardian', child.guardian_name || '—'],
-    ['Address', child.address || '—'],
+    ['Assigned Psychologist', child.psychologist_name || '—'],
+    ['Surrendered By', child.surrendered_by || '—'],
+    ['Location', location],
   ];
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(14,19,29,0.32)', display: 'flex', justifyContent: 'flex-end', zIndex: 60, animation: 'racco-fade-in var(--dur-base) var(--ease-out)' }}>
@@ -235,24 +249,41 @@ function ChildDrawer({ child, canManage, onEdit, onArchive, onClose }) {
   );
 }
 
-function ChildForm({ form, setForm, guardians, error, onSubmit, onClose }) {
+function ChildForm({ form, setForm, psychologists, error, onSubmit, onClose }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
+  const isEdit = !!form.id;
+  // Cascading location pickers; clear children when a parent changes.
+  const munis = MUNICIPALITIES[form.province] || [];
+  const brgys = BARANGAYS[form.municipality] || [];
+  const fieldLabel = { fontSize: 13, color: 'var(--text-muted)', fontWeight: 600 };
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(14,19,29,0.32)', display: 'flex', justifyContent: 'flex-end', zIndex: 70, animation: 'racco-fade-in var(--dur-base) var(--ease-out)' }}>
       <form onSubmit={onSubmit} onClick={(e) => e.stopPropagation()} style={{ width: 420, maxWidth: '92%', height: '100%', background: 'var(--surface)', boxShadow: 'var(--shadow-xl)', display: 'flex', flexDirection: 'column', animation: 'racco-slide-left var(--dur-slow) var(--ease-out)' }}>
         <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--ink-50)' }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 17, color: 'var(--text-strong)' }}>{form.id ? 'Edit Child' : 'Add Child'}</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 17, color: 'var(--text-strong)' }}>{isEdit ? 'Edit Record' : 'Add Record'}</div>
           <button type="button" onClick={onClose} aria-label="Close" {...hoverLift({ lift: -1, shadow: 'var(--shadow-md)' })} style={iconBtn('var(--text-muted)')}><Icon name="x" size={17} /></button>
         </div>
         <div className="racco-scroll" style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
           {error && <Alert tone="danger" icon={<Icon name="alert-triangle" size={18} />}>{error}</Alert>}
-          <FormField label="Full Name" required>
-            <Input value={form.fullname} onChange={(e) => setForm({ ...form, fullname: e.target.value })} required />
-          </FormField>
+          {/* Child name is not editable once a record exists (adviser). */}
+          {isEdit ? (
+            <div>
+              <div style={{ ...fieldLabel, marginBottom: 6 }}>Full Name</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 13px', borderRadius: 'var(--radius-md)', background: 'var(--ink-50)', border: '1px solid var(--border)', color: 'var(--text-strong)', fontWeight: 700, fontSize: 14 }}>
+                {form.fullname}
+                <Icon name="lock" size={13} style={{ color: 'var(--text-faint)', marginLeft: 'auto' }} />
+              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-faint)', marginTop: 5 }}>The child&apos;s name cannot be changed after the record is created.</div>
+            </div>
+          ) : (
+            <FormField label="Full Name" required>
+              <Input value={form.fullname} onChange={(e) => setForm({ ...form, fullname: e.target.value })} required />
+            </FormField>
+          )}
           <FormField label="Birth Date">
             <Input type="date" value={form.birth_date || ''} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} />
           </FormField>
@@ -261,16 +292,40 @@ function ChildForm({ form, setForm, guardians, error, onSubmit, onClose }) {
               <option value="">—</option><option>Male</option><option>Female</option>
             </Select>
           </FormField>
-          <FormField label="Address">
-            <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+          <FormField label="Province">
+            <Select value={form.province || ''} onChange={(e) => setForm({ ...form, province: e.target.value, municipality: '', barangay: '' })}>
+              <option value="">— Select province —</option>
+              {PROVINCES.map((p) => <option key={p}>{p}</option>)}
+            </Select>
+          </FormField>
+          <FormField label="Municipality / City">
+            <Select value={form.municipality || ''} disabled={!form.province} onChange={(e) => setForm({ ...form, municipality: e.target.value, barangay: '' })}>
+              <option value="">{form.province ? '— Select municipality —' : 'Select a province first'}</option>
+              {munis.map((mn) => <option key={mn}>{mn}</option>)}
+            </Select>
+          </FormField>
+          <FormField label="Barangay">
+            <Select value={form.barangay || ''} disabled={!form.municipality} onChange={(e) => setForm({ ...form, barangay: e.target.value })}>
+              <option value="">{form.municipality ? '— Select barangay —' : 'Select a municipality first'}</option>
+              {brgys.map((b) => <option key={b}>{b}</option>)}
+            </Select>
           </FormField>
           <FormField label="Case Type">
-            <Input value={form.case_type} onChange={(e) => setForm({ ...form, case_type: e.target.value })} placeholder="e.g. Foster Care, Adoption, Residential" />
+            <Select value={form.case_type || ''} onChange={(e) => setForm({ ...form, case_type: e.target.value })}>
+              <option value="">— Select case type —</option>
+              {CASE_TYPES.map((t) => <option key={t}>{t}</option>)}
+            </Select>
           </FormField>
-          <FormField label="Guardian">
-            <Select value={form.guardian || ''} onChange={(e) => setForm({ ...form, guardian: e.target.value })}>
-              <option value="">— None —</option>
-              {guardians.map((g) => <option key={g.id} value={g.id}>{g.fullname}</option>)}
+          <FormField label="Who Surrendered the Child">
+            <Select value={form.surrendered_by || ''} onChange={(e) => setForm({ ...form, surrendered_by: e.target.value })}>
+              <option value="">— Select —</option>
+              {SURRENDERED_BY.map((s) => <option key={s}>{s}</option>)}
+            </Select>
+          </FormField>
+          <FormField label="Assign Psychologist">
+            <Select value={form.psychologist || ''} onChange={(e) => setForm({ ...form, psychologist: e.target.value })}>
+              <option value="">— Unassigned —</option>
+              {psychologists.map((p) => <option key={p.id} value={p.id}>{p.fullname || p.username}</option>)}
             </Select>
           </FormField>
         </div>

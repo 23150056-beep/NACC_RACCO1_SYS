@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Avatar, RoleBadge, Icon, ROLE_META } from '../ui';
 import { INSTRUMENT_MANAGER_ROLES } from '../config/roles';
@@ -9,12 +9,11 @@ const NAV = [
   { section: 'Overview' },
   { to: '/', label: 'Dashboard', icon: 'layout-dashboard', roles: ['Administrator', 'Psychologist', 'Staff'], end: true },
   { section: 'Casework' },
-  { to: '/children', label: 'Children Records', icon: 'users', roles: ['Administrator', 'Psychologist', 'Staff'] },
+  { to: '/children', label: 'Records', icon: 'users', roles: ['Administrator', 'Psychologist', 'Staff'] },
   { section: 'Clinical' },
-  { to: '/assessment', label: 'Assessment Tools', icon: 'clipboard-list', roles: ['Psychologist'] },
+  { to: '/assessment', label: 'Assessment', icon: 'clipboard-list', roles: ['Psychologist'] },
   { to: '/questionnaires', label: 'Assessment Instruments', icon: 'clipboard-pen', roles: INSTRUMENT_MANAGER_ROLES },
-  { to: '/report', label: 'Assessment Results', icon: 'clipboard-check', roles: ['Administrator', 'Psychologist'] },
-  { to: '/report', label: 'Assessment Results', icon: 'heart-pulse', roles: ['Staff'], readonly: true },
+  { to: '/report', label: 'Assessment Results', icon: 'clipboard-check', roles: ['Administrator', 'Psychologist', 'Staff'] },
   { section: 'Governance' },
   { to: '/compliance', label: 'Compliance & Audit', icon: 'shield-check', roles: ['Administrator', 'Psychologist', 'Staff'] },
   { to: '/users', label: 'User Management', icon: 'user-cog', roles: ['Administrator'] },
@@ -34,22 +33,19 @@ function navForRole(role) {
 }
 
 export default function Sidebar() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
   const role = user?.role_name || 'Staff';
   const m = ROLE_META[role] || ROLE_META.Staff;
   const items = navForRole(role);
   const name = user?.fullname || user?.username || 'User';
 
-  const handleLogout = () => { logout(); navigate('/login'); };
-
   return (
     <aside style={{ width: 'var(--sidebar-w)', background: 'var(--surface)', borderRight: '1px solid var(--border)', height: '100%', display: 'flex', flexDirection: 'column', flex: 'none' }}>
-      <div style={{ padding: '18px 18px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 11 }}>
-        <img src="/racco-seal.jpg" alt="" style={{ width: 42, height: 42, borderRadius: '50%', objectFit: 'cover', boxShadow: 'var(--shadow-xs)' }} />
-        <div style={{ lineHeight: 1.1 }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 19, color: 'var(--blue-700)' }}>RACCO I</div>
-          <div style={{ fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase' }}>Child Care Office</div>
+      <div style={{ padding: '18px 18px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <img src="/racco-seal.jpg" alt="NACC seal" style={{ width: 54, height: 54, borderRadius: '50%', objectFit: 'cover', boxShadow: 'var(--shadow-sm)', flex: 'none' }} />
+        <div style={{ lineHeight: 1.12 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 18, color: 'var(--blue-700)' }}>NACC – RACCO 1</div>
+          <div style={{ fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase' }}>National Authority for Child Care</div>
         </div>
       </div>
 
@@ -92,14 +88,6 @@ export default function Sidebar() {
             <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
             <div style={{ marginTop: 2 }}><RoleBadge role={role} size="sm" /></div>
           </div>
-          <button
-            onClick={handleLogout} title="Sign out" aria-label="Sign out"
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', padding: 6, borderRadius: 'var(--radius-sm)', display: 'inline-flex' }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--red-500)'; e.currentTarget.style.background = 'var(--red-50)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-faint)'; e.currentTarget.style.background = 'transparent'; }}
-          >
-            <Icon name="log-out" size={17} />
-          </button>
         </div>
       </div>
     </aside>

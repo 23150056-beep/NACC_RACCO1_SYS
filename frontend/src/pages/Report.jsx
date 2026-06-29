@@ -5,6 +5,16 @@ import { Card, Badge, Alert, Input, SeverityBadge, EmptyState, Icon, iconBtn, ho
 
 function caseRef(id) { return `C-${String(id).padStart(4, '0')}`; }
 
+// Placeholder next-session = 2 weeks after the assessment date, until the
+// backend tracks scheduled sessions. Adviser: show only the Next Session.
+function nextSessionFrom(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setDate(d.getDate() + 14);
+  return d.toISOString().slice(0, 10);
+}
+
 const TRIAGE = {
   'Normal': { level: 'standard', tone: 'success' },
   'Needs Monitoring': { level: 'moderate', tone: 'warning' },
@@ -28,12 +38,16 @@ export default function Report() {
     caseType: a.child_case_type || '—',
     psychologist: a.psychologist_name || '—',
     date: a.assessment_date,
+    nextSession: a.next_session || nextSessionFrom(a.assessment_date),
     cls: a.classification || '—',
     notes: a.notes || '',
     result: a.result,
   })), [items]);
 
-  const visible = rows.filter((r) => (r.name || '').toLowerCase().includes(q.toLowerCase()) || r.ref.toLowerCase().includes(q.toLowerCase()));
+  // Adviser: improve alphabetical sorting throughout the system.
+  const visible = rows
+    .filter((r) => (r.name || '').toLowerCase().includes(q.toLowerCase()) || r.ref.toLowerCase().includes(q.toLowerCase()))
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }));
   const td = { padding: '12px 16px', fontSize: 13, color: 'var(--text-body)', whiteSpace: 'nowrap' };
 
   return (
@@ -44,7 +58,7 @@ export default function Report() {
         </Alert>
       ) : (
         <Alert tone="info" icon={<Icon name="users" size={18} />} style={{ marginBottom: 16 }} title="Saved results">
-          Completed assessments and their automated analysis appear here. Run or update an assessment from <strong>Assessment Tools</strong>.
+          Completed assessments and their automated analysis appear here. Run or update an assessment from <strong>Assessment</strong>.
         </Alert>
       )}
 
@@ -62,7 +76,7 @@ export default function Report() {
             <table style={{ width: '100%', minWidth: 760, borderCollapse: 'collapse', fontFamily: 'var(--font-sans)' }}>
               <thead>
                 <tr style={{ background: 'var(--ink-50)', borderBottom: '1px solid var(--border)' }}>
-                  {['Child', 'Case Type', 'Outcome', 'Score', 'Psychologist', 'Last Session', staff ? null : ''].filter((h) => h !== null).map((h, i) => (
+                  {['Child', 'Case Type', 'Outcome', 'Psychologist', 'Next Session', staff ? null : ''].filter((h) => h !== null).map((h, i) => (
                     <th key={i} scope="col" style={{ textAlign: 'left', padding: '12px 16px', fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -84,9 +98,8 @@ export default function Report() {
                       </td>
                       <td style={td}>{r.caseType}</td>
                       <td style={{ padding: '12px 16px' }}>{triage ? <SeverityBadge level={triage.level} size="sm" /> : <span style={{ color: 'var(--text-faint)' }}>—</span>}</td>
-                      <td style={{ padding: '12px 16px' }}><span className="racco-mono" style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-strong)' }}>{r.result && r.result.behavioral_score != null ? `${r.result.behavioral_score}` : '—'}</span></td>
                       <td style={td}>{r.psychologist}</td>
-                      <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{r.date}</td>
+                      <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{r.nextSession || '—'}</td>
                       {!staff && <td style={{ padding: '12px 16px', textAlign: 'right' }}><Icon name="chevron-right" size={16} style={{ color: 'var(--text-faint)' }} /></td>}
                     </tr>
                   );
@@ -141,7 +154,7 @@ function ResultDrawer({ row, onClose }) {
           </div>
 
           <div>
-            <div className="racco-eyebrow" style={{ fontSize: 10, marginBottom: 8 }}>Psychologist's clinical notes</div>
+            <div className="racco-eyebrow" style={{ fontSize: 10, marginBottom: 8 }}>Psychologist&apos;s clinical notes</div>
             <div style={{ background: 'var(--ink-50)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, paddingBottom: 12, marginBottom: 12, borderBottom: '1px solid var(--border)' }}>
                 <div><div style={{ fontSize: 11, color: 'var(--text-faint)' }}>Final classification</div><div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text-strong)' }}>{row.cls}</div></div>
@@ -151,9 +164,9 @@ function ResultDrawer({ row, onClose }) {
             </div>
           </div>
 
-          <Alert disclaimer title="Read-only record:">This is the signed assessment on file with NACC. To revise it, run a new session from Assessment Tools.</Alert>
+          <Alert disclaimer title="Read-only record:">This is the signed assessment on file with NACC. To revise it, run a new session from Assessment.</Alert>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-faint)' }}>
-            <Icon name="calendar" size={14} /> Last session {row.date}
+            <Icon name="calendar" size={14} /> Next session {row.nextSession || '—'}
           </div>
         </div>
       </div>

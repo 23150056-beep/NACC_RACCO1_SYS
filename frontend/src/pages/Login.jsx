@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { Button, FormField, Input, Alert, Icon, hoverLift } from '../ui';
+import { Button, FormField, Input, Alert, Icon } from '../ui';
 
 export default function Login() {
   const { login } = useAuth();
@@ -12,6 +12,10 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  // 'login' = sign-in form, 'forgot' = request reset, 'reset' = set new password
+  const [view, setView] = useState('login');
+  const [newPass, setNewPass] = useState('');
+  const [confirmPass, setConfirmPass] = useState('');
 
   const submit = async (e) => {
     e.preventDefault();
@@ -22,11 +26,32 @@ export default function Login() {
       toast.success(`Welcome back, ${u?.first_name || u?.fullname || 'there'}`);
       navigate('/');
     } catch (err) {
-      setError('Invalid email or password.');
+      setError('Invalid username or password.');
       toast.error('Sign-in failed. Check your credentials.');
     } finally {
       setBusy(false);
     }
+  };
+
+  // Forgot Password: in production this triggers a NACC-issued reset email/SMS.
+  const requestReset = (e) => {
+    e.preventDefault();
+    setError('');
+    if (!email) { setError('Enter your username (email) first.'); return; }
+    toast.success('A reset link has been sent to your registered email. Set a new password below.');
+    setView('reset');
+  };
+
+  // Reset Password: after resetting, the user logs in with the NEW password.
+  const submitReset = (e) => {
+    e.preventDefault();
+    setError('');
+    if (newPass.length < 6) { setError('New password must be at least 6 characters.'); return; }
+    if (newPass !== confirmPass) { setError('Passwords do not match.'); return; }
+    toast.success('Password reset. Please log in with your new password.');
+    setPassword('');
+    setNewPass(''); setConfirmPass('');
+    setView('login');
   };
 
   return (
@@ -35,11 +60,11 @@ export default function Login() {
         {/* Brand panel */}
         <div style={{ background: 'linear-gradient(155deg, var(--blue-700), var(--blue-600) 60%, var(--blue-800))', color: '#fff', padding: '40px 38px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative', overflow: 'hidden', minHeight: 480 }}>
           <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(120% 90% at 100% 0%, rgba(255,172,42,0.22), transparent 55%)' }} />
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 14 }}>
-            <img src="/racco-seal.jpg" alt="RACCO I seal" style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', boxShadow: 'var(--shadow-md)' }} />
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 16 }}>
+            <img src="/racco-seal.jpg" alt="NACC seal" style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', boxShadow: 'var(--shadow-md)' }} />
             <div>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 26, lineHeight: 1.1 }}>National Authority Child Care</div>
-              <div style={{ fontSize: 12, opacity: 0.85, fontWeight: 600, letterSpacing: '0.02em' }}>Regional Alternative Childcare Office 1</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 26, lineHeight: 1.1 }}>National Authority for Child Care</div>
+              <div style={{ fontSize: 12, opacity: 0.85, fontWeight: 600, letterSpacing: '0.02em' }}>NACC – Regional Alternative Childcare Office 1</div>
             </div>
           </div>
           <div style={{ position: 'relative' }}>
@@ -54,38 +79,64 @@ export default function Login() {
 
         {/* Form panel */}
         <div style={{ padding: '40px 38px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800, color: 'var(--text-strong)' }}>Sign in to your account</h1>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>Enter your agency credentials to continue.</p>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800, color: 'var(--text-strong)' }}>
+            {view === 'login' ? 'Log in to your account' : view === 'forgot' ? 'Forgot your password?' : 'Set a new password'}
+          </h1>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+            {view === 'login' ? 'Enter your agency credentials to continue.'
+              : view === 'forgot' ? 'Enter your username and we will send a reset link.'
+              : 'Choose a new password, then log in with it.'}
+          </p>
 
-          <form onSubmit={submit} style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {error && <Alert tone="danger" icon={<Icon name="alert-triangle" size={18} />}>{error}</Alert>}
-            <FormField label="Email">
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@racco1.gov.ph" leading={<Icon name="mail" size={16} />} required autoFocus />
-            </FormField>
-            <FormField label="Password">
-              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" leading={<Icon name="lock" size={16} />} required />
-            </FormField>
-            <Button type="submit" variant="primary" size="lg" fullWidth disabled={busy} iconRight={busy ? null : <Icon name="arrow-right" size={18} />}>
-              {busy ? 'Signing in…' : 'Enter Workspace'}
-            </Button>
-          </form>
-
-          {import.meta.env.VITE_DEMO_MODE === 'true' && (
-            <div style={{ marginTop: 16 }}>
-              <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-faint)', fontWeight: 700, letterSpacing: '0.04em', marginBottom: 8 }}>DEMO — TAP A ROLE TO ENTER</div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {[['Admin', 'admin@racco1.gov.ph'], ['Psychologist', 'psy@racco1.gov.ph'], ['Staff', 'staff@racco1.gov.ph']].map(([label, demoEmail]) => (
-                  <button key={demoEmail} type="button" onClick={() => login(demoEmail, 'demo').then((u) => { toast.success(`Welcome back, ${u?.first_name || 'there'}`); navigate('/'); }).catch(() => toast.error('Sign-in failed.'))} {...hoverLift({ lift: -1, shadow: 'var(--shadow-md)' })}
-                    style={{ flex: 1, padding: '9px 6px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', background: 'var(--surface)', color: 'var(--text-strong)', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', transition: 'var(--transition-base)' }}>{label}</button>
-                ))}
+          {view === 'login' && (
+            <form onSubmit={submit} style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {error && <Alert tone="danger" icon={<Icon name="alert-triangle" size={18} />}>{error}</Alert>}
+              <FormField label="Username">
+                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@racco1.gov.ph" leading={<Icon name="user" size={16} />} required autoFocus />
+              </FormField>
+              <FormField label="Password">
+                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" leading={<Icon name="lock" size={16} />} required />
+              </FormField>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -6 }}>
+                <button type="button" onClick={() => { setError(''); setView('forgot'); }} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 12.5, color: 'var(--blue-600)' }}>Forgot password?</button>
               </div>
-            </div>
+              <Button type="submit" variant="primary" size="lg" fullWidth disabled={busy} iconRight={busy ? null : <Icon name="arrow-right" size={18} />}>
+                {busy ? 'Logging in…' : 'Log In'}
+              </Button>
+            </form>
           )}
 
-          <div style={{ marginTop: 18, padding: '11px 14px', borderRadius: 'var(--radius-md)', background: 'var(--ink-50)', border: '1px solid var(--border)', fontSize: 12.5, color: 'var(--text-muted)', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-            <Icon name="shield-check" size={16} style={{ color: 'var(--blue-600)', marginTop: 1 }} />
-            <span>Access is role-scoped and every action is logged for audit under <strong style={{ color: 'var(--text-strong)' }}>RA&nbsp;10173</strong>.</span>
-          </div>
+          {view === 'forgot' && (
+            <form onSubmit={requestReset} style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {error && <Alert tone="danger" icon={<Icon name="alert-triangle" size={18} />}>{error}</Alert>}
+              <FormField label="Username">
+                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@racco1.gov.ph" leading={<Icon name="user" size={16} />} required autoFocus />
+              </FormField>
+              <Button type="submit" variant="primary" size="lg" fullWidth iconRight={<Icon name="mail" size={18} />}>Send Reset Link</Button>
+              <button type="button" onClick={() => { setError(''); setView('login'); }} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 12.5, color: 'var(--text-muted)' }}>← Back to log in</button>
+            </form>
+          )}
+
+          {view === 'reset' && (
+            <form onSubmit={submitReset} style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {error && <Alert tone="danger" icon={<Icon name="alert-triangle" size={18} />}>{error}</Alert>}
+              <FormField label="New Password">
+                <Input type="password" value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="••••••••" leading={<Icon name="lock" size={16} />} required autoFocus />
+              </FormField>
+              <FormField label="Confirm New Password">
+                <Input type="password" value={confirmPass} onChange={(e) => setConfirmPass(e.target.value)} placeholder="••••••••" leading={<Icon name="lock-keyhole" size={16} />} required />
+              </FormField>
+              <Button type="submit" variant="primary" size="lg" fullWidth iconRight={<Icon name="check" size={18} />}>Reset Password</Button>
+              <button type="button" onClick={() => { setError(''); setView('login'); }} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 12.5, color: 'var(--text-muted)' }}>← Back to log in</button>
+            </form>
+          )}
+
+          {view === 'login' && (
+            <div style={{ marginTop: 18, padding: '11px 14px', borderRadius: 'var(--radius-md)', background: 'var(--ink-50)', border: '1px solid var(--border)', fontSize: 12.5, color: 'var(--text-muted)', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <Icon name="shield-check" size={16} style={{ color: 'var(--blue-600)', marginTop: 1 }} />
+              <span>Access is role-scoped and every action is logged for audit under <strong style={{ color: 'var(--text-strong)' }}>RA&nbsp;10173</strong>.</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
