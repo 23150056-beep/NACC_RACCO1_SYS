@@ -40,7 +40,7 @@ This rework finishes the intended RBAC: psychologists are isolated to their assi
 |---|---|---|---|
 | Records (children) | only `assigned_psychologist = self` | all | all |
 | Assign / reassign psychologist | — | ✅ | ✅ |
-| Take assessment | only **assigned** children + **owned** instruments | any (full access) | ✗ (cannot take) |
+| Take assessment | only **assigned** children + **owned** instruments | ✗ (psychologists only) | ✗ (cannot take) |
 | Assessment results | own assigned children's, per carry-history rule | all | all (read-only) |
 | Instruments | only ones they **own** | all + set/reassign owner | ✗ |
 | Dashboard | metrics over assigned children | agency-wide | agency-wide |
@@ -67,10 +67,9 @@ This rework finishes the intended RBAC: psychologists are isolated to their assi
   - So with **carry = yes**, the assignee sees the child's full history; with **carry = no**, only assessments they authored for that child.
 - Admin/Staff → all.
 
-**Take assessment (`AssessmentWriteSerializer.validate`, when requester is a Psychologist):**
+**Take assessment (`AssessmentWriteSerializer.validate`) — psychologists only (`ASSESSMENT_TAKER_ROLES = (Psychologist,)`):**
 - Reject unless `child.assigned_psychologist == request.user` (`"That child is not assigned to you."`).
 - Reject unless `questionnaire.owner == request.user` (`"That instrument is not yours."`).
-- Admins bypass these checks (full access).
 
 **Instruments (`QuestionnaireViewSet` + `ActiveQuestionnaireListView`):**
 - Psychologist → `filter(owner=self)`; Admin → all.
@@ -102,6 +101,7 @@ This rework finishes the intended RBAC: psychologists are isolated to their assi
 
 - Models + migrations (§4).
 - `children/views.py` — scope `ChildViewSet.get_queryset` for psychologists.
+- `accounts/permissions.py` — `ASSESSMENT_TAKER_ROLES = (Role.PSYCHOLOGIST,)` (remove Administrator; taking + analyze are psychologist-only).
 - `assessments/views.py` — scope `AssessmentViewSet.get_queryset` (carry-history rule), scope `QuestionnaireViewSet.get_queryset` + `ActiveQuestionnaireListView` by owner, force/require `owner` on create.
 - `assessments/serializers.py` — add `owner` to `QuestionnaireSerializer`; add assigned-child + owned-instrument validation to `AssessmentWriteSerializer`.
 - `children/serializers.py` — expose `assignee_sees_history` (write) on `ChildSerializer`.
@@ -144,6 +144,6 @@ The reporting spec's **Child Progress Report** (psychologist sees "assigned/own"
 
 ---
 
-## 13. Open Questions (for review)
-- **Admin taking assessments:** admins are currently allowed to take assessments (and would bypass the assigned/owned checks). Keep that, or restrict assessment-taking to psychologists only? (Leaning: keep, since admins are full-access.)
-- **Staff reassigning:** both Admin and Staff can assign/reassign per your instruction — confirm Staff should also be able to flip the carry-history choice.
+## 13. Resolved Decisions
+- **Assessment-taking is psychologist-only** — `ASSESSMENT_TAKER_ROLES = (Role.PSYCHOLOGIST,)`; admins no longer take or analyze assessments (they oversee/report).
+- **Staff can flip carry-history** — both Admin and Staff assign/reassign and set the "carry history?" choice.
