@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button, Icon } from '../ui';
+import { Button, Icon, hoverLift } from '../ui';
 
 const FACES = ['😞', '😕', '😐', '🙂', '😄'];
 
@@ -61,7 +61,7 @@ function Choices({ question, value, onChoose }) {
         {FACES.map((face, i) => {
           const n = String(i + 1); const on = value === n;
           return (
-            <button key={n} onClick={() => onChoose(n)} style={{ ...big(on), width: 92, height: 104, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+            <button key={n} onClick={() => onChoose(n)} {...hoverLift()} style={{ ...big(on), width: 92, height: 104, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
               <span style={{ fontSize: 40, transform: on ? 'scale(1.12)' : 'none', transition: 'var(--transition-base)' }}>{face}</span>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: on ? 'var(--blue-700)' : 'var(--text-faint)' }}>{n}</span>
             </button>
@@ -81,7 +81,7 @@ function Choices({ question, value, onChoose }) {
       {opts.map(([emoji, label]) => {
         const on = value === label;
         return (
-          <button key={label} onClick={() => onChoose(label)} style={{ ...big(on), padding: wide ? '20px 36px' : '16px 24px', minWidth: wide ? 150 : 200, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 19, color: on ? 'var(--blue-700)' : 'var(--text-strong)' }}>
+          <button key={label} onClick={() => onChoose(label)} {...hoverLift()} style={{ ...big(on), padding: wide ? '20px 36px' : '16px 24px', minWidth: wide ? 150 : 200, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 19, color: on ? 'var(--blue-700)' : 'var(--text-strong)' }}>
             {emoji && <span style={{ fontSize: 30 }}>{emoji}</span>}{label}
           </button>
         );

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Button, FormField, Input, Alert, Icon } from '../ui';
+import { Button, FormField, Input, Alert, Icon, hoverLift } from '../ui';
 
 export default function Login() {
   const { login } = useAuth();
@@ -74,8 +74,8 @@ export default function Login() {
               <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-faint)', fontWeight: 700, letterSpacing: '0.04em', marginBottom: 8 }}>DEMO — TAP A ROLE TO ENTER</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 {[['Admin', 'admin@racco1.gov.ph'], ['Psychologist', 'psy@racco1.gov.ph'], ['Staff', 'staff@racco1.gov.ph']].map(([label, demoEmail]) => (
-                  <button key={demoEmail} type="button" onClick={() => login(demoEmail, 'demo').then(() => navigate('/')).catch(() => {})}
-                    style={{ flex: 1, padding: '9px 6px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', background: 'var(--surface)', color: 'var(--text-strong)', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 12.5, cursor: 'pointer' }}>{label}</button>
+                  <button key={demoEmail} type="button" onClick={() => login(demoEmail, 'demo').then(() => navigate('/')).catch(() => {})} {...hoverLift({ lift: -1, shadow: 'var(--shadow-md)' })}
+                    style={{ flex: 1, padding: '9px 6px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', background: 'var(--surface)', color: 'var(--text-strong)', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', transition: 'var(--transition-base)' }}>{label}</button>
                 ))}
               </div>
             </div>

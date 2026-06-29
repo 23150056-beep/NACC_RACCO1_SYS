@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Avatar, Icon, ROLE_META } from '../ui';
+import { Avatar, Icon, ROLE_META, hoverLift, hoverTint } from '../ui';
 import { useActivity } from '../context/ActivityContext';
 
 const SCREEN_TITLES = {
@@ -104,6 +104,7 @@ export default function Topbar() {
         <div ref={notifRef} style={{ position: 'relative' }}>
           <button
             onClick={() => setNotifOpen((o) => { const next = !o; if (next) markSeen(); return next; })} aria-label={`Notifications${unread ? `, ${unread} unread` : ''}`} aria-expanded={notifOpen} aria-haspopup="true"
+            {...hoverLift({ lift: -1, shadow: 'var(--shadow-md)' })}
             style={{ position: 'relative', background: notifOpen ? 'var(--blue-50)' : 'var(--ink-50)', border: `1px solid ${notifOpen ? 'var(--blue-200)' : 'var(--border)'}`, borderRadius: 'var(--radius-md)', width: 40, height: 40, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: notifOpen ? 'var(--blue-600)' : 'var(--text-body)', transition: 'var(--transition-base)' }}
           >
             <Icon name="bell" size={18} />
@@ -144,7 +145,7 @@ export default function Topbar() {
                   );
                 })}
               </div>
-              <button onClick={() => { setNotifOpen(false); navigate('/'); }} style={{ width: '100%', padding: '11px 16px', background: 'var(--ink-50)', border: 'none', borderTop: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 12.5, color: 'var(--blue-600)' }}>View all activity</button>
+              <button onClick={() => { setNotifOpen(false); navigate('/'); }} {...hoverTint('var(--blue-50)')} style={{ width: '100%', padding: '11px 16px', background: 'var(--ink-50)', border: 'none', borderTop: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 12.5, color: 'var(--blue-600)', transition: 'background var(--dur-fast)' }}>View all activity</button>
             </div>
           )}
         </div>

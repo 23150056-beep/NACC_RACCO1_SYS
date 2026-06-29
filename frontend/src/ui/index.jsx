@@ -96,11 +96,11 @@ export function Button({ children, variant = 'primary', size = 'md', iconLeft = 
   return (
     <button
       type={type} disabled={disabled} onClick={onClick}
-      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: s.gap, height: s.height, padding: s.padding, fontSize: s.fontSize, fontFamily: 'var(--font-sans)', fontWeight: 700, lineHeight: 1, borderRadius: s.radius, cursor: disabled ? 'not-allowed' : 'pointer', width: fullWidth ? '100%' : 'auto', whiteSpace: 'nowrap', opacity: disabled ? 0.5 : 1, transition: 'transform var(--dur-fast) var(--ease-out), filter var(--dur-fast) var(--ease-out)', ...v, ...style }}
+      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: s.gap, height: s.height, padding: s.padding, fontSize: s.fontSize, fontFamily: 'var(--font-sans)', fontWeight: 700, lineHeight: 1, borderRadius: s.radius, cursor: disabled ? 'not-allowed' : 'pointer', width: fullWidth ? '100%' : 'auto', whiteSpace: 'nowrap', opacity: disabled ? 0.5 : 1, transition: 'transform var(--dur-fast) var(--ease-out), filter var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out)', ...v, ...style }}
       onMouseDown={(e) => { if (!disabled) e.currentTarget.style.transform = 'translateY(1px)'; }}
-      onMouseUp={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.filter = 'none'; }}
-      onMouseEnter={(e) => { if (!disabled && variant !== 'ghost') e.currentTarget.style.filter = 'brightness(0.96)'; else if (!disabled) e.currentTarget.style.background = 'var(--ink-50)'; }}
+      onMouseUp={(e) => { if (!disabled) e.currentTarget.style.transform = 'translateY(-1px)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.filter = 'none'; e.currentTarget.style.background = v.background; e.currentTarget.style.boxShadow = v.boxShadow; }}
+      onMouseEnter={(e) => { if (disabled) return; e.currentTarget.style.transform = 'translateY(-1px)'; if (variant === 'ghost') { e.currentTarget.style.background = 'var(--ink-50)'; } else { e.currentTarget.style.filter = 'brightness(0.96)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; } }}
       {...rest}
     >
       {iconLeft && <span style={{ display: 'inline-flex' }}>{iconLeft}</span>}
@@ -361,7 +361,10 @@ export function Tabs({ tabs = [], active, onChange, style = {} }) {
       {tabs.map((t) => {
         const on = t.id === active;
         return (
-          <button key={t.id} type="button" onClick={() => onChange && onChange(t.id)} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 7, padding: '10px 14px', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 'var(--text-base)', color: on ? 'var(--blue-700)' : 'var(--text-muted)', marginBottom: -1, borderBottom: `2px solid ${on ? 'var(--blue-600)' : 'transparent'}`, transition: 'color var(--dur-fast)' }}>
+          <button key={t.id} type="button" onClick={() => onChange && onChange(t.id)}
+            onMouseEnter={(e) => { if (!on) { e.currentTarget.style.color = 'var(--text-strong)'; e.currentTarget.style.borderBottomColor = 'var(--ink-300)'; } }}
+            onMouseLeave={(e) => { if (!on) { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderBottomColor = 'transparent'; } }}
+            style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 7, padding: '10px 14px', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 'var(--text-base)', color: on ? 'var(--blue-700)' : 'var(--text-muted)', marginBottom: -1, borderBottom: `2px solid ${on ? 'var(--blue-600)' : 'transparent'}`, transition: 'color var(--dur-fast), border-color var(--dur-fast)' }}>
             {t.label}
             {t.count != null && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 'var(--radius-pill)', background: on ? 'var(--blue-100)' : 'var(--ink-100)', color: on ? 'var(--blue-700)' : 'var(--text-muted)' }}>{t.count}</span>}
           </button>
@@ -373,7 +376,44 @@ export function Tabs({ tabs = [], active, onChange, style = {} }) {
 
 /* Small shared icon-button style used by drawers/tables */
 export function iconBtn(color, dim = 30) {
-  return { width: dim, height: dim, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--surface)', color, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
+  return { width: dim, height: dim, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--surface)', color, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', transition: 'var(--transition-base)' };
+}
+
+/* ----------------------------- Shared hover ----------------------------- *
+ * One prominent hover treatment for every clickable SURFACE (cards, selection
+ * tiles, option pills, icon buttons, role buttons): lift + elevated shadow +
+ * a touch of brightness. Spread {...hoverLift()} onto the element. It captures
+ * and restores the element's own inline transform/shadow/filter, so it composes
+ * with selected/active states without clobbering them. Give the element a
+ * `transition` (var(--transition-base)) so the change animates.
+ * Rows and flat text controls can't lift — use hoverTint() for those. */
+export function hoverLift({ lift = -2, shadow = 'var(--shadow-lg)', brightness = 0.98 } = {}) {
+  return {
+    onMouseEnter: (e) => {
+      const el = e.currentTarget;
+      el.dataset.hlShadow = el.style.boxShadow;
+      el.dataset.hlTransform = el.style.transform;
+      el.dataset.hlFilter = el.style.filter;
+      el.style.transform = `translateY(${lift}px)`;
+      el.style.boxShadow = shadow;
+      el.style.filter = `brightness(${brightness})`;
+    },
+    onMouseLeave: (e) => {
+      const el = e.currentTarget;
+      el.style.transform = el.dataset.hlTransform || '';
+      el.style.boxShadow = el.dataset.hlShadow || '';
+      el.style.filter = el.dataset.hlFilter || '';
+    },
+  };
+}
+
+/* Background-tint hover for elements that must not lift (table rows, flat list
+ * items). Restores whatever inline background the element already had. */
+export function hoverTint(tint = 'var(--blue-50)') {
+  return {
+    onMouseEnter: (e) => { const el = e.currentTarget; el.dataset.htBg = el.style.background; el.style.background = tint; },
+    onMouseLeave: (e) => { const el = e.currentTarget; el.style.background = el.dataset.htBg || 'transparent'; },
+  };
 }
 
 export const PAGE = { padding: '24px 26px', maxWidth: 'var(--content-max)', margin: '0 auto' };

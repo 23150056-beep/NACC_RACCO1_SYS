@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api/client';
 import { useActivity } from '../context/ActivityContext';
-import { Card, Button, Alert, Select, FormField, ProgressSteps, Icon, PAGE } from '../ui';
+import { Card, Button, Alert, Select, FormField, ProgressSteps, Icon, PAGE, hoverLift } from '../ui';
 import RespondentSurvey from '../components/RespondentSurvey';
 
 function caseRef(id) { return `C-${String(id).padStart(4, '0')}`; }
@@ -95,7 +95,7 @@ export default function Assessment() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {children.length === 0 && <Alert tone="info" icon={<Icon name="info" size={18} />}>No child records available yet. Add children under Children Records first.</Alert>}
                 {children.map((c) => (
-                  <button key={c.id} onClick={() => setChild(String(c.id))} style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '13px 15px', textAlign: 'left', cursor: 'pointer', borderRadius: 'var(--radius-lg)', background: String(child) === String(c.id) ? 'var(--blue-50)' : 'var(--surface)', border: `1.5px solid ${String(child) === String(c.id) ? 'var(--blue-500)' : 'var(--border)'}`, transition: 'var(--transition-base)' }}>
+                  <button key={c.id} onClick={() => setChild(String(c.id))} {...hoverLift()} style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '13px 15px', textAlign: 'left', cursor: 'pointer', borderRadius: 'var(--radius-lg)', background: String(child) === String(c.id) ? 'var(--blue-50)' : 'var(--surface)', border: `1.5px solid ${String(child) === String(c.id) ? 'var(--blue-500)' : 'var(--border)'}`, transition: 'var(--transition-base)' }}>
                     <span style={{ width: 38, height: 38, borderRadius: 'var(--radius-md)', background: 'var(--ink-100)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', flex: 'none' }}><Icon name="user" size={19} /></span>
                     <span style={{ flex: 1 }}>
                       <span style={{ display: 'block', fontWeight: 700, fontSize: 14.5, color: 'var(--text-strong)' }}>{c.fullname}</span>
@@ -221,7 +221,7 @@ function QuestionInput({ question, value, onChange }) {
     return (
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         {[1, 2, 3, 4, 5].map((n) => (
-          <button key={n} onClick={() => onChange(String(n))} style={{ ...pill(String(n), value === String(n)), width: 40, height: 40, borderRadius: '50%', padding: 0 }}>{n}</button>
+          <button key={n} onClick={() => onChange(String(n))} {...hoverLift({ shadow: 'var(--shadow-md)' })} style={{ ...pill(String(n), value === String(n)), width: 40, height: 40, borderRadius: '50%', padding: 0 }}>{n}</button>
         ))}
         <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-faint)', marginLeft: 6 }}><span>Never</span><span>Always</span></div>
       </div>
@@ -233,7 +233,7 @@ function QuestionInput({ question, value, onChange }) {
   }
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-      {opts.map((o) => <button key={o} onClick={() => onChange(o)} style={pill(o, value === o)}>{o}</button>)}
+      {opts.map((o) => <button key={o} onClick={() => onChange(o)} {...hoverLift({ shadow: 'var(--shadow-md)' })} style={pill(o, value === o)}>{o}</button>)}
     </div>
   );
 }

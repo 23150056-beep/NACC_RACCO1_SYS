@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import api from '../api/client';
 import { useActivity } from '../context/ActivityContext';
-import { Card, Button, Badge, Input, Select, FormField, Alert, EmptyState, Icon, iconBtn, PAGE } from '../ui';
+import { Card, Button, Badge, Input, Select, FormField, Alert, EmptyState, Icon, iconBtn, hoverLift, PAGE } from '../ui';
 
 const TYPES = [
   { v: 'rating_scale', label: 'Rating scale (1–5)' },
@@ -127,8 +127,8 @@ export default function Questionnaires() {
                     <td style={{ padding: '12px 16px' }}><Badge tone={STATUS_TONE[qn.status] || 'neutral'} dot>{qn.status}</Badge></td>
                     <td style={{ padding: '12px 16px' }}>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <button title="Edit" aria-label={`Edit ${qn.title}`} onClick={() => openEdit(qn)} style={iconBtn('var(--blue-600)')}><Icon name="pencil" size={15} /></button>
-                        <button title="Archive" aria-label={`Archive ${qn.title}`} onClick={() => archive(qn)} style={iconBtn('var(--red-500)')}><Icon name="archive" size={15} /></button>
+                        <button title="Edit" aria-label={`Edit ${qn.title}`} onClick={() => openEdit(qn)} {...hoverLift({ lift: -1, shadow: 'var(--shadow-md)' })} style={iconBtn('var(--blue-600)')}><Icon name="pencil" size={15} /></button>
+                        <button title="Archive" aria-label={`Archive ${qn.title}`} onClick={() => archive(qn)} {...hoverLift({ lift: -1, shadow: 'var(--shadow-md)' })} style={iconBtn('var(--red-500)')}><Icon name="archive" size={15} /></button>
                       </div>
                     </td>
                   </tr>
@@ -144,7 +144,7 @@ export default function Questionnaires() {
           <div onClick={(e) => e.stopPropagation()} style={{ width: 560, maxWidth: '94%', height: '100%', background: 'var(--surface)', boxShadow: 'var(--shadow-xl)', display: 'flex', flexDirection: 'column', animation: 'racco-slide-left var(--dur-slow) var(--ease-out)' }}>
             <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--ink-50)' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 17, color: 'var(--text-strong)' }}>{form.id ? 'Edit Questionnaire' : 'New Questionnaire'}</div>
-              <button type="button" onClick={() => setForm(null)} aria-label="Close" style={iconBtn('var(--text-muted)')}><Icon name="x" size={17} /></button>
+              <button type="button" onClick={() => setForm(null)} aria-label="Close" {...hoverLift({ lift: -1, shadow: 'var(--shadow-md)' })} style={iconBtn('var(--text-muted)')}><Icon name="x" size={17} /></button>
             </div>
 
             <div className="racco-scroll" style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -193,9 +193,9 @@ export default function Questionnaires() {
                       )}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <button title="Move up" onClick={() => move(i, -1)} style={iconBtn('var(--text-muted)', 28)}><Icon name="chevron-up" size={14} /></button>
-                      <button title="Move down" onClick={() => move(i, 1)} style={iconBtn('var(--text-muted)', 28)}><Icon name="chevron-down" size={14} /></button>
-                      <button title="Remove" onClick={() => removeQuestion(i)} style={iconBtn('var(--red-500)', 28)}><Icon name="trash-2" size={14} /></button>
+                      <button title="Move up" onClick={() => move(i, -1)} {...hoverLift({ lift: -1, shadow: 'var(--shadow-md)' })} style={iconBtn('var(--text-muted)', 28)}><Icon name="chevron-up" size={14} /></button>
+                      <button title="Move down" onClick={() => move(i, 1)} {...hoverLift({ lift: -1, shadow: 'var(--shadow-md)' })} style={iconBtn('var(--text-muted)', 28)}><Icon name="chevron-down" size={14} /></button>
+                      <button title="Remove" onClick={() => removeQuestion(i)} {...hoverLift({ lift: -1, shadow: 'var(--shadow-md)' })} style={iconBtn('var(--red-500)', 28)}><Icon name="trash-2" size={14} /></button>
                     </div>
                   </div>
                 </div>

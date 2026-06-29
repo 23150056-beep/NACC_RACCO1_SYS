@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { Card, Badge, Alert, Input, SeverityBadge, EmptyState, Icon, iconBtn, PAGE } from '../ui';
+import { Card, Badge, Alert, Input, SeverityBadge, EmptyState, Icon, iconBtn, hoverLift, PAGE } from '../ui';
 
 function caseRef(id) { return `C-${String(id).padStart(4, '0')}`; }
 
@@ -120,7 +120,7 @@ function ResultDrawer({ row, onClose }) {
             <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 17, color: 'var(--text-strong)' }}>{row.name}</div>
             <div className="racco-mono" style={{ fontSize: 12, color: 'var(--text-muted)' }}>{row.ref} · {row.caseType}</div>
           </div>
-          <button onClick={onClose} aria-label="Close panel" title="Close" style={iconBtn('var(--text-muted)', 32)}><Icon name="x" size={17} /></button>
+          <button onClick={onClose} aria-label="Close panel" title="Close" {...hoverLift({ lift: -1, shadow: 'var(--shadow-md)' })} style={iconBtn('var(--text-muted)', 32)}><Icon name="x" size={17} /></button>
         </div>
 
         <div className="racco-scroll" style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 18 }}>
