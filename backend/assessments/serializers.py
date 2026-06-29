@@ -89,7 +89,7 @@ class AssessmentResultSerializer(serializers.ModelSerializer):
     class Meta:
         model = AssessmentResult
         fields = ["behavioral_score", "classification", "generated_date",
-                  "priority_level", "recommendation_text"]
+                  "confidence", "overridden", "priority_level", "recommendation_text"]
 
     def _first_rec(self, obj):
         return obj.recommendations.first()

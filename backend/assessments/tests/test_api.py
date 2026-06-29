@@ -274,6 +274,14 @@ class AssessmentTakingTest(APITestCase):
         from assessments.models import AssessmentResult
         self.assertFalse(AssessmentResult.objects.get().overridden)
 
+    def test_result_payload_includes_confidence(self):
+        self._auth("p@racco1.gov.ph")
+        self.client.post("/api/assessments/", self._assessment_payload(), format="json")
+        resp = self.client.get("/api/assessments/")
+        self.assertIn("confidence", resp.data[0]["result"])
+        self.assertIn("overridden", resp.data[0]["result"])
+        self.assertEqual(resp.data[0]["result"]["confidence"], 100)
+
     def test_analyze_returns_confidence_and_flag(self):
         self._auth("p@racco1.gov.ph")
         resp = self.client.post("/api/assessments/analyze/", {
