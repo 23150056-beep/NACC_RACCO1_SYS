@@ -52,6 +52,8 @@ class Child(models.Model):
         "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="assigned_children",
     )
+    # Set at (re)assignment: does the current assignee see the child's prior assessments.
+    assignee_sees_history = models.BooleanField(default=True)
     fullname = models.CharField(max_length=150)
     birth_date = models.DateField(null=True, blank=True)
     gender = models.CharField(max_length=10, blank=True)

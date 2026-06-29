@@ -17,6 +17,10 @@ class ActivityLog(models.Model):
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name="activities")
+    # Directs a notification at a specific user (e.g. the newly assigned psychologist).
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="notifications")
     actor_label = models.CharField(max_length=150, blank=True)
     action = models.CharField(max_length=20, choices=ACTION_CHOICES)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)

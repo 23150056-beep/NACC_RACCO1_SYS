@@ -11,6 +11,10 @@ class Questionnaire(models.Model):
     age_group = models.CharField(max_length=50, blank=True)
     description = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=DRAFT)
+    # Owner-only model: each instrument belongs to one psychologist (admin assigns/reassigns).
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="owned_instruments")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
