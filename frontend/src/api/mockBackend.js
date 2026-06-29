@@ -99,6 +99,7 @@ function concernFor(question, answer) {
   }
   return null;
 }
+const BOUNDARY_LOW = 34, BOUNDARY_HIGH = 67, BOUNDARY_MARGIN = 15, W_COV = 0.5, W_DEC = 0.5;
 function scoreQ(questionnaire, responses) {
   const qmap = {};
   (questionnaire.questions || []).forEach((qq) => { qmap[qq.id] = qq; });
@@ -118,7 +119,6 @@ function scoreQ(questionnaire, responses) {
   const coverage = total ? items.length / total : 0;
   return { behavioral_score: score, classification, scored_count: items.length, total_count: total, top_concerns: top, confidence: confidenceFor(coverage, score) };
 }
-const BOUNDARY_LOW = 34, BOUNDARY_HIGH = 67, BOUNDARY_MARGIN = 15, W_COV = 0.5, W_DEC = 0.5;
 function confidenceFor(coverage, behavioral) {
   if (behavioral == null) return 0;
   const margin = Math.min(Math.abs(behavioral - BOUNDARY_LOW), Math.abs(behavioral - BOUNDARY_HIGH));

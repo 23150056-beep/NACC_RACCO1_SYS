@@ -56,7 +56,7 @@ No settings store exists. Add a **singleton** `AnalysisSetting` model in the `as
 - Singleton via a `load()` classmethod (get-or-create `pk=1`); `save()` pins `pk=1`.
 - One migration. Optionally seed the row in `seed_initial_data` (otherwise `load()` creates it lazily).
 
-**API** (`/api/assessments/settings/`, `RetrieveUpdateAPIView` over the singleton):
+**API** (`/api/analysis-settings/`, `RetrieveUpdateAPIView` over the singleton — mounted outside the `assessments/` router prefix to avoid colliding with the `assessments/<pk>/` detail route):
 - **GET** — any authenticated assessor (so the wizard/UI can read the threshold). Returns `{min_confidence_threshold, require_override_on_low_confidence}`.
 - **PUT/PATCH** — **Administrator only.**
 
@@ -89,7 +89,7 @@ Add two fields (one migration):
 
 ## 8. Frontend
 
-- **`Settings.jsx`** — on mount, GET `/assessments/settings/` to initialize the threshold slider and the override toggle from the server. **Save Configuration** does a real PUT (Admin); the success toast becomes truthful. Errors surfaced; non-admins see it as read-only.
+- **`Settings.jsx`** — on mount, GET `/analysis-settings/` to initialize the threshold slider and the override toggle from the server. **Save Configuration** does a real PUT (Admin); the success toast becomes truthful. Errors surfaced. (The Settings route is already Admin-only via `roles={['Administrator']}`, so non-admins never reach the page.)
 - **`Assessment.jsx`** —
   - `AnalysisPanel` shows the **confidence %** next to the score, and when `flagged`, a distinct low-confidence callout explaining why review is required.
   - When `analysis.flagged`, render an **override checkbox**: *"I have reviewed this low-confidence result and accept responsibility for the assessment."*
