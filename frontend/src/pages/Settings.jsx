@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import api from '../api/client';
 import { Card, Button, Badge, Alert, Input, FormField, Switch, Icon, PAGE } from '../ui';
 
 export default function Settings() {
@@ -7,12 +8,39 @@ export default function Settings() {
   const [sync, setSync] = useState(true);
   const [override, setOverride] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    api.get('/analysis-settings/')
+      .then((r) => { setThreshold(r.data.min_confidence_threshold); setOverride(r.data.require_override_on_low_confidence); })
+      .catch(() => {});
+  }, []);
+
+  const saveConfig = async () => {
+    setError('');
+    try {
+      await api.put('/analysis-settings/', {
+        min_confidence_threshold: threshold,
+        require_override_on_low_confidence: override,
+      });
+      setSaved(true); setTimeout(() => setSaved(false), 2600);
+    } catch (err) {
+      setError(err.response?.status === 403
+        ? 'Only an Administrator can change these settings.'
+        : 'Could not save settings. Please try again.');
+    }
+  };
 
   return (
     <div style={{ ...PAGE, maxWidth: 760 }}>
       {saved && (
         <div style={{ position: 'fixed', top: 78, right: 26, zIndex: 50 }}>
           <Alert tone="success" icon={<Icon name="check-circle-2" size={18} />} style={{ boxShadow: 'var(--shadow-lg)' }}>Settings saved successfully.</Alert>
+        </div>
+      )}
+      {error && (
+        <div style={{ position: 'fixed', top: 78, right: 26, zIndex: 50 }}>
+          <Alert tone="danger" icon={<Icon name="alert-triangle" size={18} />} style={{ boxShadow: 'var(--shadow-lg)' }}>{error}</Alert>
         </div>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -43,7 +71,7 @@ export default function Settings() {
         </Card>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <Button variant="primary" onClick={() => { setSaved(true); setTimeout(() => setSaved(false), 2600); }} iconLeft={<Icon name="save" size={17} />}>Save Configuration</Button>
+          <Button variant="primary" onClick={saveConfig} iconLeft={<Icon name="save" size={17} />}>Save Configuration</Button>
         </div>
       </div>
     </div>
