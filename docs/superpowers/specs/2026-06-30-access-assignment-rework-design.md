@@ -25,6 +25,7 @@ This rework finishes the intended RBAC: psychologists are isolated to their assi
 3. **Instrument ownership** — each instrument owned by exactly one psychologist (owner-only model).
 4. **Server-side enforcement** (querysets + serializer validation), not just hidden UI.
 5. **UX refinements:** (a) move "Assessment Instruments" nav into Casework below Records; (b) "View Results" shortcut on the Assessment page; (c) answers recap on Review & Sign.
+6. **Role-scoped notifications** — admin (all), staff (case-coordination stream), psychologist (only events targeted to them, e.g., a new assigned child immediately).
 
 ### Out of scope
 - The reporting feature itself (separate spec) — though this makes its "assigned children" assumptions real.
@@ -53,7 +54,8 @@ This rework finishes the intended RBAC: psychologists are isolated to their assi
 
 - **`Questionnaire.owner`** → `ForeignKey(User, on_delete=SET_NULL, null=True, blank=True, related_name="owned_instruments")` — the one psychologist who owns the instrument. Null allowed for legacy rows (admin assigns later); SET_NULL so archiving/removing a user never deletes instruments.
 - **`Child.assignee_sees_history`** → `BooleanField(default=True)` — set at (re)assignment; controls whether the **current** assignee sees the child's prior assessments.
-- Migrations: `assessments/000X_questionnaire_owner.py`, `children/000X_child_assignee_sees_history.py`.
+- **`ActivityLog.recipient`** → `ForeignKey(User, null=True, blank=True, on_delete=SET_NULL, related_name="notifications")` — directs a notification at a specific user (e.g., the newly assigned psychologist).
+- Migrations: `assessments/000X_questionnaire_owner.py`, `children/000X_child_assignee_sees_history.py`, `activity/000X_activitylog_recipient.py`.
 
 ---
 
@@ -97,6 +99,31 @@ This rework finishes the intended RBAC: psychologists are isolated to their assi
 
 ---
 
+## 7.5 Notification Scoping
+
+The activity log doubles as both the **audit trail** (admin) and the **notification feed** (the Topbar bell). It becomes role-aware:
+
+| Role | Notification feed |
+|---|---|
+| **Admin** | All events (full audit stream) — unchanged. |
+| **Staff** | Case-coordination stream: child-record events (created/updated/archived) + "assessment signed". Excludes security/login, user-management, and instrument events. |
+| **Psychologist** | Only events where `recipient = self`: a new child assigned to them (immediate), changes to their assigned children's records, and an instrument assigned to them. Nothing else. |
+
+**Recipient-setting rules (when logging):**
+- Child **(re)assigned** to psychologist P → event with `recipient = P` ("You were assigned [child]"), created immediately.
+- Child record **created/updated/archived** → `recipient = child.assigned_psychologist` (if set).
+- Instrument **owner set/changed** by admin → `recipient = owner`.
+- "Assessment signed" stays a staff/admin stream event (the authoring psychologist took the action themselves).
+
+**Feed query (`ActivityLogViewSet.get_queryset`):**
+- Admin → all.
+- Staff → `category = record` AND `entity_type in (Child, Guardian, Assessment)`.
+- Psychologist → `recipient = request.user`.
+
+"Immediate" = the event is created the instant it happens and appears on the bell's next refresh (existing polling); real-time websocket push is out of scope.
+
+---
+
 ## 8. Backend Changes Summary
 
 - Models + migrations (§4).
@@ -106,6 +133,7 @@ This rework finishes the intended RBAC: psychologists are isolated to their assi
 - `assessments/serializers.py` — add `owner` to `QuestionnaireSerializer`; add assigned-child + owned-instrument validation to `AssessmentWriteSerializer`.
 - `children/serializers.py` — expose `assignee_sees_history` (write) on `ChildSerializer`.
 - Activity logging on (re)assignment.
+- `activity/` — add `recipient` to `ActivityLog`; role-scope `ActivityLogViewSet.get_queryset` (admin all / staff case-stream / psychologist `recipient=self`); set `recipient` in logging calls per §7.5.
 
 ## 9. Frontend Changes Summary
 
@@ -114,6 +142,7 @@ This rework finishes the intended RBAC: psychologists are isolated to their assi
 - `Questionnaires.jsx` (Instruments) — psychologist sees own; admin sees all with an **owner** column + owner picker on create.
 - `Sidebar.jsx` — nav move.
 - Dashboard — psychologist view scoped to caseload.
+- Topbar notifications — feed is now server-scoped per role; simplify the bell's category tabs for non-admins (psychologist/staff don't need the Users/Security tabs).
 
 ---
 
@@ -140,7 +169,8 @@ The reporting spec's **Child Progress Report** (psychologist sees "assigned/own"
 2. A psychologist sees/uses **only instruments they own**; admin can create instruments for, and reassign them between, psychologists.
 3. Reassigning a child offers the **carry-history** choice and it governs what the new psychologist sees.
 4. The three UX refinements are in place (nav move, View Results shortcut, answers recap).
-5. All new access rules are covered by passing backend tests.
+5. Notifications are role-scoped: a psychologist is notified immediately when a child is assigned to them and sees only their own; staff see the case-coordination stream; admin sees all.
+6. All new access rules are covered by passing backend tests.
 
 ---
 
