@@ -250,11 +250,18 @@ class AnalysisSettingApiTest(APITestCase):
             "min_confidence_threshold": 70, "require_override_on_low_confidence": False}, format="json")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.data["min_confidence_threshold"], 70)
+        from assessments.models import AnalysisSetting
+        self.assertEqual(AnalysisSetting.load().min_confidence_threshold, 70)
 
     def test_non_admin_cannot_update(self):
         self._auth("p@racco1.gov.ph")
         resp = self.client.put("/api/analysis-settings/", {
             "min_confidence_threshold": 70, "require_override_on_low_confidence": True}, format="json")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_non_admin_cannot_patch(self):
+        self._auth("p@racco1.gov.ph")
+        resp = self.client.patch("/api/analysis-settings/", {"min_confidence_threshold": 60}, format="json")
         self.assertEqual(resp.status_code, 403)
 
     def test_threshold_out_of_range_rejected(self):
