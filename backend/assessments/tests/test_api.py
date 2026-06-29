@@ -271,6 +271,8 @@ class AssessmentTakingTest(APITestCase):
         self._auth("p@racco1.gov.ph")
         resp = self.client.post("/api/assessments/", self._low_conf_payload(), format="json")
         self.assertEqual(resp.status_code, 201)
+        from assessments.models import AssessmentResult
+        self.assertFalse(AssessmentResult.objects.get().overridden)
 
     def test_analyze_returns_confidence_and_flag(self):
         self._auth("p@racco1.gov.ph")

@@ -120,6 +120,7 @@ class AssessmentViewSet(viewsets.ModelViewSet):
         if questionnaire is not None:
             responses = [{"question": r["question"].id, "answer": r.get("answer", "")}
                          for r in serializer.validated_data.get("responses", [])]
+            # Pre-save gate score; _persist_analysis re-scores from saved rows (deterministic, same result).
             confidence = scoring.score(questionnaire, responses)["confidence"]
             flagged = (setting.require_override_on_low_confidence
                        and confidence < setting.min_confidence_threshold)
@@ -130,18 +131,17 @@ class AssessmentViewSet(viewsets.ModelViewSet):
                 "confidence": confidence,
                 "threshold": setting.min_confidence_threshold,
             }, status=status.HTTP_400_BAD_REQUEST)
-        self._overridden = flagged
-        self.perform_create(serializer)
+        self.perform_create(serializer, overridden=flagged)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
-    def perform_create(self, serializer):
+    def perform_create(self, serializer, overridden=False):
         assessment = serializer.save(psychologist=self.request.user, status="completed")
-        self._persist_analysis(assessment)
+        self._persist_analysis(assessment, overridden=overridden)
         log_activity(self.request.user, ActivityLog.CREATED, ActivityLog.RECORD,
                      entity_type="Assessment", entity_label=assessment.child.fullname, entity_id=assessment.id)
 
-    def _persist_analysis(self, assessment):
+    def _persist_analysis(self, assessment, overridden=False):
         if not assessment.questionnaire_id:
             return
         responses = [{"question": r.question_id, "answer": r.answer} for r in assessment.responses.all()]
@@ -152,7 +152,7 @@ class AssessmentViewSet(viewsets.ModelViewSet):
             behavioral_score=result["behavioral_score"],
             classification=result["classification"],
             confidence=result["confidence"],
-            overridden=getattr(self, "_overridden", False),
+            overridden=overridden,
             assessment_date=assessment.assessment_date,
             assessment_type=assessment.assessment_type,
         )
