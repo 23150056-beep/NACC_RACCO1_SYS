@@ -34,8 +34,8 @@ export default function Login() {
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 14 }}>
             <img src="/racco-seal.jpg" alt="RACCO I seal" style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', boxShadow: 'var(--shadow-md)' }} />
             <div>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 26, lineHeight: 1 }}>RACCO I</div>
-              <div style={{ fontSize: 12, opacity: 0.85, fontWeight: 600, letterSpacing: '0.02em' }}>Ilocos Region · Child Care Office</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 26, lineHeight: 1.1 }}>National Authority Child Care</div>
+              <div style={{ fontSize: 12, opacity: 0.85, fontWeight: 600, letterSpacing: '0.02em' }}>Regional Alternative Childcare Office 1</div>
             </div>
           </div>
           <div style={{ position: 'relative' }}>
@@ -45,9 +45,6 @@ export default function Login() {
             <p style={{ marginTop: 12, fontSize: 14, opacity: 0.85, lineHeight: 1.6, maxWidth: 320 }}>
               Behavioral Assessment &amp; Counseling Support System for the National Authority for Child Care.
             </p>
-          </div>
-          <div style={{ position: 'relative', fontSize: 11, opacity: 0.7, fontFamily: 'var(--font-mono)' }}>
-            2/F Ordoña Bldg., MacArthur Highway, Bauang, La Union
           </div>
         </div>
 
