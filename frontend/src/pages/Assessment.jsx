@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../api/client';
 import { useActivity } from '../context/ActivityContext';
 import { Card, Button, Alert, Select, FormField, ProgressSteps, Icon, PAGE, hoverLift } from '../ui';
+import { useToast } from '../context/ToastContext';
 import RespondentSurvey from '../components/RespondentSurvey';
 
 function caseRef(id) { return `C-${String(id).padStart(4, '0')}`; }
@@ -10,6 +11,7 @@ const CLASSIFICATIONS = ['Trauma / Stressor-related', 'Behavioral / Conduct', 'A
 
 export default function Assessment() {
   const { refresh: refreshActivity } = useActivity();
+  const toast = useToast();
   const [step, setStep] = useState(1);
   const [children, setChildren] = useState([]);
   const [forms, setForms] = useState([]); // active questionnaires
@@ -63,6 +65,7 @@ export default function Assessment() {
         responses: questions.map((q) => ({ question: q.id, answer: String(answers[q.id]) })),
         override_acknowledged: override,
       });
+      toast.success('Assessment signed & saved');
       setSent(true);
       refreshActivity();
       setTimeout(() => {
@@ -75,6 +78,7 @@ export default function Assessment() {
       } else {
         setError(typeof data === 'string' ? data : JSON.stringify(data || 'Submit failed'));
       }
+      toast.error(data?.code === 'override_required' ? 'Low-confidence result needs override' : 'Could not save the assessment');
     }
   };
 
@@ -153,11 +157,6 @@ export default function Assessment() {
 
           {step === 4 && (
             <div>
-              {sent && (
-                <div style={{ position: 'fixed', top: 78, right: 26, zIndex: 50 }}>
-                  <Alert tone="success" icon={<Icon name="check-circle-2" size={18} />} style={{ boxShadow: 'var(--shadow-lg)' }}>Assessment saved to NACC.</Alert>
-                </div>
-              )}
               {error && <Alert tone="danger" icon={<Icon name="alert-triangle" size={18} />} style={{ marginBottom: 14 }}>{error}</Alert>}
 
               {childObj && <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 14px' }}>For <strong style={{ color: 'var(--text-strong)' }}>{childObj.fullname}</strong> · <span className="racco-mono">{caseRef(childObj.id)}</span> · {form?.title} · {stype}</p>}

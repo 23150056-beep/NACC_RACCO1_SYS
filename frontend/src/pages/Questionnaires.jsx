@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import api from '../api/client';
 import { useActivity } from '../context/ActivityContext';
 import { Card, Button, Badge, Input, Select, FormField, Alert, EmptyState, Icon, iconBtn, hoverLift, PAGE } from '../ui';
+import { useToast } from '../context/ToastContext';
 
 const TYPES = [
   { v: 'rating_scale', label: 'Rating scale (1–5)' },
@@ -16,6 +17,7 @@ const blankForm = () => ({ title: '', age_group: '', description: '', status: 'd
 
 export default function Questionnaires() {
   const { refresh: refreshActivity } = useActivity();
+  const toast = useToast();
   const [items, setItems] = useState([]);
   const [form, setForm] = useState(null);
   const [banner, setBanner] = useState('');
@@ -80,16 +82,23 @@ export default function Questionnaires() {
     try {
       if (form.id) await api.put(`/questionnaires/${form.id}/`, payload);
       else await api.post('/questionnaires/', payload);
+      toast.success(publish ? 'Questionnaire published' : (form.id ? 'Questionnaire updated' : 'Questionnaire created'));
       setForm(null); load(); refreshActivity();
     } catch (err) {
       setError(JSON.stringify(err.response?.data || 'Save failed'));
+      toast.error('Could not save the questionnaire. Please try again.');
     }
   };
 
   const archive = async (qn) => {
     if (!window.confirm(`Archive “${qn.title}”?`)) return;
-    await api.post(`/questionnaires/${qn.id}/archive/`);
-    load(); refreshActivity();
+    try {
+      await api.post(`/questionnaires/${qn.id}/archive/`);
+      toast.success(`“${qn.title}” archived`);
+      load(); refreshActivity();
+    } catch (err) {
+      toast.error('Could not archive the questionnaire.');
+    }
   };
 
   return (

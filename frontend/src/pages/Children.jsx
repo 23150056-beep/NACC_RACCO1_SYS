@@ -4,6 +4,7 @@ import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useActivity } from '../context/ActivityContext';
 import { Card, Button, Badge, Input, Select, FormField, Avatar, SeverityBadge, Alert, EmptyState, Icon, iconBtn, hoverLift, PAGE } from '../ui';
+import { useToast } from '../context/ToastContext';
 
 // NOTE: clinical severity is not yet tracked on the backend (Child.status is the
 // active/archived soft-delete flag). Until assessments are wired, we derive a
@@ -28,6 +29,7 @@ const EMPTY = { fullname: '', birth_date: '', gender: '', address: '', case_type
 export default function Children() {
   const { user } = useAuth();
   const { refresh: refreshActivity } = useActivity();
+  const toast = useToast();
   const canManage = ['Administrator', 'Staff'].includes(user?.role_name);
   const [children, setChildren] = useState([]);
   const [guardians, setGuardians] = useState([]);
@@ -80,20 +82,27 @@ export default function Children() {
     try {
       if (form.id) await api.put(`/children/${form.id}/`, payload);
       else await api.post('/children/', payload);
+      toast.success(form.id ? 'Child record updated' : 'Child record added');
       setForm(null);
       load();
       refreshActivity();
     } catch (err) {
       setError(JSON.stringify(err.response?.data || 'Save failed'));
+      toast.error('Could not save the record. Please try again.');
     }
   };
 
   const archive = async (c) => {
     if (!window.confirm(`Archive ${c.fullname}?`)) return;
-    await api.post(`/children/${c.id}/archive/`);
-    setSel(null);
-    load();
-    refreshActivity();
+    try {
+      await api.post(`/children/${c.id}/archive/`);
+      toast.success(`${c.fullname} archived`);
+      setSel(null);
+      load();
+      refreshActivity();
+    } catch (err) {
+      toast.error('Could not archive the record.');
+    }
   };
 
   return (

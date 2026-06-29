@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../api/client';
 import { useActivity } from '../context/ActivityContext';
 import { Card, Button, Alert, Input, Select, FormField, Avatar, RoleBadge, EmptyState, Icon, iconBtn, hoverLift, PAGE } from '../ui';
+import { useToast } from '../context/ToastContext';
 
 const EMPTY = { email: '', username: '', first_name: '', last_name: '', middle_initial: '', contact_details: '', role: '', password: '' };
 
@@ -11,6 +12,7 @@ export default function Users() {
   const [form, setForm] = useState(null);
   const [error, setError] = useState('');
   const { refresh: refreshActivity } = useActivity();
+  const toast = useToast();
 
   const load = () => api.get('/users/').then((r) => setUsers(r.data));
   useEffect(() => {
@@ -30,19 +32,26 @@ export default function Users() {
       if (!payload.password) delete payload.password;
       if (form.id) await api.put(`/users/${form.id}/`, payload);
       else await api.post('/users/', payload);
+      toast.success(form.id ? 'User updated' : 'User added');
       setForm(null);
       load();
       refreshActivity();
     } catch (err) {
       setError(JSON.stringify(err.response?.data || 'Save failed'));
+      toast.error('Could not save the user. Please try again.');
     }
   };
 
   const archive = async (u) => {
     if (!window.confirm(`Deactivate ${u.fullname || u.email}?`)) return;
-    await api.post(`/users/${u.id}/archive/`);
-    load();
-    refreshActivity();
+    try {
+      await api.post(`/users/${u.id}/archive/`);
+      toast.success(`${u.fullname || u.email} deactivated`);
+      load();
+      refreshActivity();
+    } catch (err) {
+      toast.error('Could not deactivate the user.');
+    }
   };
 
   const toneFor = (role) => (role === 'Administrator' ? 'brand' : role === 'Psychologist' ? 'red' : 'amber');

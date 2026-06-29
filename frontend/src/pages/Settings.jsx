@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/client';
-import { Card, Button, Badge, Alert, Input, FormField, Switch, Icon, PAGE } from '../ui';
+import { Card, Button, Badge, Input, FormField, Switch, Icon, PAGE } from '../ui';
+import { useToast } from '../context/ToastContext';
 
 export default function Settings() {
+  const toast = useToast();
   const [agency, setAgency] = useState('St. Joseph Orphanage');
   const [threshold, setThreshold] = useState(80);
   const [sync, setSync] = useState(true);
   const [override, setOverride] = useState(true);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     api.get('/analysis-settings/')
@@ -17,15 +17,14 @@ export default function Settings() {
   }, []);
 
   const saveConfig = async () => {
-    setError('');
     try {
       await api.put('/analysis-settings/', {
         min_confidence_threshold: threshold,
         require_override_on_low_confidence: override,
       });
-      setSaved(true); setTimeout(() => setSaved(false), 2600);
+      toast.success('Settings saved');
     } catch (err) {
-      setError(err.response?.status === 403
+      toast.error(err.response?.status === 403
         ? 'Only an Administrator can change these settings.'
         : 'Could not save settings. Please try again.');
     }
@@ -33,16 +32,6 @@ export default function Settings() {
 
   return (
     <div style={{ ...PAGE, maxWidth: 760 }}>
-      {saved && (
-        <div style={{ position: 'fixed', top: 78, right: 26, zIndex: 50 }}>
-          <Alert tone="success" icon={<Icon name="check-circle-2" size={18} />} style={{ boxShadow: 'var(--shadow-lg)' }}>Settings saved successfully.</Alert>
-        </div>
-      )}
-      {error && (
-        <div style={{ position: 'fixed', top: 78, right: 26, zIndex: 50 }}>
-          <Alert tone="danger" icon={<Icon name="alert-triangle" size={18} />} style={{ boxShadow: 'var(--shadow-lg)' }}>{error}</Alert>
-        </div>
-      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         <Card eyebrow="Agency" title="Configuration" padding="22px">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

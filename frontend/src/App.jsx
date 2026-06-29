@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, HashRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ActivityProvider } from './context/ActivityContext';
+import { ToastProvider } from './context/ToastContext';
 import { INSTRUMENT_MANAGER_ROLES } from './config/roles';
 import ProtectedRoute from './components/ProtectedRoute';
 import Sidebar from './components/Sidebar';
@@ -41,6 +42,7 @@ function DemoBadge() {
 export default function App() {
   return (
     <AuthProvider>
+      <ToastProvider>
       <ActivityProvider>
         <DemoBadge />
         <Router>
@@ -57,6 +59,7 @@ export default function App() {
           </Routes>
         </Router>
       </ActivityProvider>
+      </ToastProvider>
     </AuthProvider>
   );
 }
