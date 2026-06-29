@@ -25,6 +25,7 @@ export default function Assessment() {
   const [respondentMode, setRespondentMode] = useState('staff');
   const [analysis, setAnalysis] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [override, setOverride] = useState(false);
 
   useEffect(() => {
     api.get('/children/').then((r) => setChildren(r.data)).catch(() => {});
@@ -33,7 +34,7 @@ export default function Assessment() {
 
   useEffect(() => {
     if (step !== 4 || !form) return;
-    setAnalysis(null); setAnalyzing(true);
+    setAnalysis(null); setAnalyzing(true); setOverride(false);
     api.post('/assessments/analyze/', {
       questionnaire: form.id,
       responses: questions.map((q) => ({ question: q.id, answer: String(answers[q.id]) })),
@@ -60,6 +61,7 @@ export default function Assessment() {
         notes,
         respondent_mode: respondentMode,
         responses: questions.map((q) => ({ question: q.id, answer: String(answers[q.id]) })),
+        override_acknowledged: override,
       });
       setSent(true);
       refreshActivity();
@@ -67,7 +69,12 @@ export default function Assessment() {
         setSent(false); setStep(1); setChild(''); setFormId(''); setAnswers({}); setNotes(''); setRespondentMode('staff'); setAnalysis(null);
       }, 2600);
     } catch (err) {
-      setError(JSON.stringify(err.response?.data || 'Submit failed'));
+      const data = err.response?.data;
+      if (data?.code === 'override_required') {
+        setError(`Confidence ${data.confidence}% is below the ${data.threshold}% threshold — tick the override box to proceed.`);
+      } else {
+        setError(typeof data === 'string' ? data : JSON.stringify(data || 'Submit failed'));
+      }
     }
   };
 
@@ -157,6 +164,18 @@ export default function Assessment() {
 
               <AnalysisPanel analyzing={analyzing} analysis={analysis} />
 
+              {analysis?.flagged && (
+                <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 'var(--radius-lg)', background: 'var(--red-50)', border: '1px solid var(--red-100)' }}>
+                  <p style={{ fontSize: 12.5, color: 'var(--red-700)', margin: '0 0 8px', lineHeight: 1.5 }}>
+                    This result is below the minimum confidence threshold ({analysis.min_confidence_threshold}%). Review it before signing.
+                  </p>
+                  <label style={{ display: 'flex', gap: 9, alignItems: 'flex-start', fontSize: 13, color: 'var(--text-strong)', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} style={{ marginTop: 2, accentColor: 'var(--blue-600)' }} />
+                    <span>I have reviewed this low-confidence result and accept responsibility for the assessment.</span>
+                  </label>
+                </div>
+              )}
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <FormField label="Practitioner classification">
                   <Select value={cls} onChange={(e) => setCls(e.target.value)}>
@@ -174,7 +193,7 @@ export default function Assessment() {
             <Button variant="ghost" disabled={step === 1} onClick={back} iconLeft={<Icon name="arrow-left" size={17} />}>Back</Button>
             {step < 4
               ? <Button variant="primary" onClick={next} disabled={(step === 1 && !child) || (step === 2 && !formId) || (step === 3 && !allAnswered)} iconRight={<Icon name="arrow-right" size={17} />}>Next Step</Button>
-              : <Button variant="primary" disabled={!notes.trim() || sent} onClick={submit} iconLeft={<Icon name="pen-line" size={17} />}>Sign &amp; Submit to NACC</Button>}
+              : <Button variant="primary" disabled={!notes.trim() || sent || (analysis?.flagged && !override)} onClick={submit} iconLeft={<Icon name="pen-line" size={17} />}>Sign &amp; Submit to NACC</Button>}
           </div>
         </Card>
       </div>
@@ -241,6 +260,11 @@ function AnalysisPanel({ analyzing, analysis }) {
             <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 17, color: tone.fg }}>{analysis.classification}</span>
             {analysis.behavioral_score != null && <span className="racco-mono" style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>Score {analysis.behavioral_score} / 100</span>}
             <span style={{ fontSize: 11.5, color: 'var(--text-faint)' }}>based on {analysis.scored_count} of {analysis.total_count} items</span>
+            {analysis.confidence != null && (
+              <span className="racco-mono" style={{ fontSize: 12.5, fontWeight: 700, color: analysis.flagged ? 'var(--red-700)' : 'var(--text-strong)' }}>
+                Confidence {analysis.confidence}%
+              </span>
+            )}
           </div>
           <p style={{ fontSize: 13.5, color: 'var(--text-body)', lineHeight: 1.6, margin: '0 0 8px' }}>{analysis.recommendation_text}</p>
           <span style={{ display: 'inline-block', fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: tone.fg }}>Priority: {analysis.priority_level}</span>
