@@ -76,6 +76,8 @@ class AssessmentResult(models.Model):
         Assessment, on_delete=models.CASCADE, related_name="result")
     behavioral_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     classification = models.CharField(max_length=50, blank=True)
+    confidence = models.PositiveSmallIntegerField(null=True, blank=True)
+    overridden = models.BooleanField(default=False)
     assessment_date = models.DateField(null=True, blank=True)
     assessment_type = models.CharField(max_length=50, blank=True)
     generated_date = models.DateTimeField(auto_now_add=True)
