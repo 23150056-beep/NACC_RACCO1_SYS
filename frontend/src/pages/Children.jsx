@@ -176,7 +176,19 @@ export default function Children() {
                     </td>
                     <td style={td}>{c.gender || '—'} {c.age != null ? `· ${c.age} (${c.group})` : ''}</td>
                     <td style={td}>{c.case_type || '—'}</td>
-                    <td style={td}>{c.psychologist_name || '—'}</td>
+                    <td style={td}>
+                      {c.psychologist_name
+                        ? c.psychologist_name
+                        : canManage
+                          ? (
+                            <button title={`Assign a psychologist to ${c.fullname}`} aria-label={`Assign psychologist to ${c.fullname}`}
+                              onClick={(e) => { e.stopPropagation(); openEdit(c); }} {...hoverLift({ lift: -1, shadow: 'var(--shadow-md)' })}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 'var(--radius-pill)', border: '1px dashed var(--blue-300)', background: 'var(--blue-50)', color: 'var(--blue-700)', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 12, cursor: 'pointer', transition: 'var(--transition-base)' }}>
+                              <Icon name="user-plus" size={13} /> Assign
+                            </button>
+                          )
+                          : '—'}
+                    </td>
                     <td style={{ padding: '11px 16px' }}><SeverityBadge level={c.severity} size="sm" /></td>
                     {canManage && (
                       <td style={{ padding: '11px 16px' }} onClick={(e) => e.stopPropagation()}>
