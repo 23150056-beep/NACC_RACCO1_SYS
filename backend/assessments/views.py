@@ -6,13 +6,18 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from accounts.models import Role
-from accounts.permissions import CanManageInstruments, CanTakeAssessments, CanViewResults, IsAdministrator
+from accounts.permissions import (
+    CanManageInstruments, CanTakeAssessments, CanViewResults, IsAdministrator, IsAdminOrStaff,
+)
 from activity.models import ActivityLog
 from activity.services import log_activity
+from assessments import reports
 from assessments.models import Questionnaire, Assessment, AssessmentResult, Recommendation, AnalysisSetting
+from children.models import Child
+from children.serializers import ChildSerializer
 from assessments.serializers import (
     QuestionnaireSerializer, AssessmentWriteSerializer, AssessmentListSerializer,
-    AnalysisSettingSerializer,
+    AssessmentEditSerializer, AnalysisSettingSerializer,
 )
 from assessments.analysis import scoring, recommendations
 from assessments.extraction.base import ExtractionError
@@ -194,6 +199,39 @@ class AssessmentViewSet(viewsets.ModelViewSet):
             "flagged": flagged,
         }, status=status.HTTP_200_OK)
 
+    def partial_update(self, request, *args, **kwargs):
+        # Editable-with-audit: owning psychologist edits notes/classification only,
+        # blocked once finalized; AI result fields are never editable.
+        assessment = self.get_object()
+        if assessment.psychologist_id != request.user.id:
+            return Response({"detail": "You can only edit your own assessments."},
+                            status=status.HTTP_403_FORBIDDEN)
+        if assessment.is_locked:
+            return Response({"detail": "This assessment is finalized and can no longer be edited."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        serializer = AssessmentEditSerializer(assessment, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        log_activity(request.user, ActivityLog.UPDATED, ActivityLog.RECORD,
+                     entity_type="Assessment", entity_label=assessment.child.fullname,
+                     entity_id=assessment.id, recipient=assessment.child.assigned_psychologist)
+        return Response(AssessmentListSerializer(assessment).data)
+
+    @action(detail=True, methods=["post"])
+    def finalize(self, request, pk=None):
+        from django.utils import timezone
+        assessment = self.get_object()
+        if assessment.psychologist_id != request.user.id:
+            return Response({"detail": "You can only finalize your own assessments."},
+                            status=status.HTTP_403_FORBIDDEN)
+        assessment.is_locked = True
+        assessment.locked_at = timezone.now()
+        assessment.save(update_fields=["is_locked", "locked_at", "updated_at"])
+        log_activity(request.user, ActivityLog.UPDATED, ActivityLog.RECORD,
+                     entity_type="Assessment", entity_label=assessment.child.fullname,
+                     entity_id=assessment.id, recipient=assessment.child.assigned_psychologist)
+        return Response({"status": "locked"})
+
 
 class AnalysisSettingView(generics.RetrieveUpdateAPIView):
     serializer_class = AnalysisSettingSerializer
@@ -205,3 +243,74 @@ class AnalysisSettingView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return AnalysisSetting.load()
+
+
+class ChildReportView(generics.GenericAPIView):
+    """Per-child progress report: profile + ordered assessment history + trajectory."""
+    permission_classes = [CanViewResults]
+
+    def get(self, request, child_id):
+        try:
+            child = Child.objects.get(pk=child_id)
+        except Child.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        role = getattr(getattr(request.user, "role", None), "role_name", None)
+        if role == Role.PSYCHOLOGIST and child.assigned_psychologist_id != request.user.id:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        qs = (Assessment.objects.filter(child=child)
+              .select_related("result", "psychologist")
+              .prefetch_related("result__recommendations")
+              .order_by("assessment_date", "id"))
+        if role == Role.PSYCHOLOGIST and not child.assignee_sees_history:
+            qs = qs.filter(psychologist=request.user)
+        assessments = list(qs)
+        scores = [getattr(a, "result", None).behavioral_score if getattr(a, "result", None) else None
+                  for a in assessments]
+        return Response({
+            "child": ChildSerializer(child).data,
+            "assessments": AssessmentListSerializer(assessments, many=True).data,
+            "trajectory": reports.trajectory(scores),
+        })
+
+
+def _summary_csv(data):
+    import csv
+    from django.http import HttpResponse
+    resp = HttpResponse(content_type="text/csv")
+    resp["Content-Disposition"] = 'attachment; filename="agency-summary.csv"'
+    w = csv.writer(resp)
+    w.writerow(["Metric", "Value"])
+    w.writerow(["Total assessments", data["total"]])
+    w.writerow(["Children assessed", data["children"]])
+    w.writerow(["Average score", data["avg_score"]])
+    w.writerow(["Average confidence", data["avg_confidence"]])
+    w.writerow(["Low-confidence (overridden)", data["overridden"]])
+    w.writerow([])
+    w.writerow(["Classification", "Count"])
+    for k, v in data["by_classification"].items():
+        w.writerow([k, v])
+    w.writerow([])
+    w.writerow(["Psychologist", "Assessments"])
+    for p in data["per_psychologist"]:
+        w.writerow([p["name"], p["count"]])
+    return resp
+
+
+class SummaryReportView(generics.GenericAPIView):
+    """Agency Assessment Summary (admin + staff): aggregates over a date range."""
+    permission_classes = [IsAdminOrStaff]
+
+    def get(self, request):
+        rng = request.query_params.get("range", "monthly")
+        qs = (Assessment.objects.select_related("child", "psychologist", "result")
+              .prefetch_related("result__recommendations").order_by("assessment_date", "id"))
+        frm, to = request.query_params.get("from"), request.query_params.get("to")
+        if frm:
+            qs = qs.filter(assessment_date__gte=frm)
+        if to:
+            qs = qs.filter(assessment_date__lte=to)
+        data = reports.summary(list(qs), rng)
+        # NB: `format` is reserved by DRF content negotiation, so use `export`.
+        if request.query_params.get("export") == "csv":
+            return _summary_csv(data)
+        return Response(data)

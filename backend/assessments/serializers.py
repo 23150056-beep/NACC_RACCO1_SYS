@@ -78,6 +78,13 @@ class AssessmentWriteSerializer(serializers.ModelSerializer):
         return assessment
 
 
+class AssessmentEditSerializer(serializers.ModelSerializer):
+    """Editable-with-audit: a psychologist may revise only these two fields."""
+    class Meta:
+        model = Assessment
+        fields = ["id", "notes", "classification"]
+
+
 class AssessmentListSerializer(serializers.ModelSerializer):
     child_name = serializers.CharField(source="child.fullname", read_only=True)
     child_case_type = serializers.CharField(source="child.case_type", read_only=True, default="")
