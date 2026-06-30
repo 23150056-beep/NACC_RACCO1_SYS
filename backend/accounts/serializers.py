@@ -29,6 +29,8 @@ class UserSerializer(serializers.ModelSerializer):
 
 class UserWriteSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    # Email IS the username — the field is optional and derived from email.
+    username = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = User
@@ -39,6 +41,8 @@ class UserWriteSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         password = validated_data.pop("password", None) or "changeme123"
+        if not validated_data.get("username"):
+            validated_data["username"] = validated_data.get("email")
         user = User(**validated_data)
         user.set_password(password)
         user.save()
@@ -51,6 +55,9 @@ class UserWriteSerializer(serializers.ModelSerializer):
             validated_data.pop("role", None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+        # Keep username in sync with email (email is the username).
+        if validated_data.get("email"):
+            instance.username = validated_data["email"]
         if password:
             instance.set_password(password)
         instance.save()

@@ -4,7 +4,7 @@ import { useActivity } from '../context/ActivityContext';
 import { Card, Button, Alert, Input, Select, FormField, Avatar, RoleBadge, EmptyState, Icon, iconBtn, hoverLift, PAGE } from '../ui';
 import { useToast } from '../context/ToastContext';
 
-const EMPTY = { email: '', username: '', first_name: '', last_name: '', middle_initial: '', contact_details: '', role: '', password: '' };
+const EMPTY = { email: '', first_name: '', last_name: '', middle_initial: '', contact_details: '', role: '', password: '' };
 
 export default function Users() {
   const [users, setUsers] = useState([]);
@@ -110,7 +110,7 @@ export default function Users() {
             </div>
             <div className="racco-scroll" style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
               {error && <Alert tone="danger" icon={<Icon name="alert-triangle" size={18} />}>{error}</Alert>}
-              {[['first_name', 'First Name'], ['middle_initial', 'Middle Initial'], ['last_name', 'Last Name'], ['username', 'Username'], ['email', 'Email'], ['contact_details', 'Contact Details']].map(([k, label]) => (
+              {[['first_name', 'First Name'], ['middle_initial', 'Middle Initial'], ['last_name', 'Last Name'], ['email', 'Email'], ['contact_details', 'Contact Details']].map(([k, label]) => (
                 <FormField key={k} label={label}>
                   <Input value={form[k] || ''} onChange={(e) => setForm({ ...form, [k]: e.target.value })} type={k === 'email' ? 'email' : 'text'} />
                 </FormField>
