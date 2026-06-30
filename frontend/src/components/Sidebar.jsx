@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Avatar, RoleBadge, Icon, ROLE_META } from '../ui';
+import { Icon, ROLE_META } from '../ui';
 import { INSTRUMENT_MANAGER_ROLES } from '../config/roles';
 
 // Role-gated navigation. Sections render only when they contain a visible item.
@@ -37,7 +37,6 @@ export default function Sidebar() {
   const role = user?.role_name || 'Staff';
   const m = ROLE_META[role] || ROLE_META.Staff;
   const items = navForRole(role);
-  const name = user?.fullname || user?.username || 'User';
 
   return (
     <aside style={{ width: 'var(--sidebar-w)', background: 'var(--surface)', borderRight: '1px solid var(--border)', height: '100%', display: 'flex', flexDirection: 'column', flex: 'none' }}>
@@ -80,16 +79,6 @@ export default function Sidebar() {
           )
         )}
       </nav>
-
-      <div style={{ padding: 12, borderTop: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 6px' }}>
-          <Avatar name={name} tone={m.tone} size="md" />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
-            <div style={{ marginTop: 2 }}><RoleBadge role={role} size="sm" /></div>
-          </div>
-        </div>
-      </div>
     </aside>
   );
 }
