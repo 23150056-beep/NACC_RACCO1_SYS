@@ -82,6 +82,21 @@ class ReportApiTest(APITestCase):
         self.assertEqual(resp["Content-Type"], "text/csv")
         self.assertIn("Total assessments", resp.content.decode())
 
+    def test_dashboard_current_state_for_admin(self):
+        self._auth("a@racco1.gov.ph")
+        resp = self.client.get("/api/reports/dashboard/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["total_children"], 1)
+        # latest assessment for the child is "Needs Monitoring"
+        self.assertEqual(resp.data["by_status"]["monitoring"], 1)
+        self.assertEqual(resp.data["by_status"]["attention"], 0)
+
+    def test_dashboard_scoped_for_psychologist(self):
+        self._auth("p@racco1.gov.ph")
+        resp = self.client.get("/api/reports/dashboard/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["total_children"], 1)  # only their assigned child
+
 
 class AssessmentEditTest(APITestCase):
     def setUp(self):

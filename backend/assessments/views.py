@@ -314,3 +314,45 @@ class SummaryReportView(generics.GenericAPIView):
         if request.query_params.get("export") == "csv":
             return _summary_csv(data)
         return Response(data)
+
+
+class DashboardView(generics.GenericAPIView):
+    """Current-state dashboard stats (per-child latest classification), role-scoped:
+    psychologist -> their assigned children; admin/staff -> all."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        role = getattr(getattr(request.user, "role", None), "role_name", None)
+        rng = request.query_params.get("range", "monthly")
+        children = Child.objects.exclude(status=Child.ARCHIVED)
+        assessments = (Assessment.objects.select_related("result", "child", "psychologist")
+                       .prefetch_related("result__recommendations"))
+        if role == Role.PSYCHOLOGIST:
+            children = children.filter(assigned_psychologist=request.user)
+            assessments = assessments.filter(child__assigned_psychologist=request.user)
+        assessments = list(assessments.order_by("assessment_date", "id"))
+
+        latest = {}
+        for a in assessments:
+            latest[a.child_id] = a  # ordered, so this keeps the newest
+        by_status = {"attention": 0, "monitoring": 0, "normal": 0}
+        for a in latest.values():
+            r = getattr(a, "result", None)
+            cls = r.classification if r else None
+            if cls == "Needs Counseling Attention":
+                by_status["attention"] += 1
+            elif cls == "Needs Monitoring":
+                by_status["monitoring"] += 1
+            elif cls == "Normal":
+                by_status["normal"] += 1
+
+        total = children.count()
+        agg = reports.summary(assessments, rng)
+        return Response({
+            "total_children": total,
+            "by_status": by_status,
+            "unassessed": max(0, total - len(latest)),
+            "trend": agg["trend"][-6:],
+            "per_psychologist": agg["per_psychologist"],
+            "by_case_type": agg["by_case_type"],
+        })
