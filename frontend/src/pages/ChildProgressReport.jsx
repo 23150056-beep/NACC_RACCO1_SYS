@@ -1,0 +1,162 @@
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceArea, ResponsiveContainer } from 'recharts';
+import api from '../api/client';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { Card, Button, Badge, Alert, Select, FormField, Icon, iconBtn, PAGE } from '../ui';
+
+const TRAJ = {
+  improving: { label: 'Improving', icon: 'trending-down', color: 'var(--success-600)', bg: 'var(--success-50)' },
+  worsening: { label: 'Worsening', icon: 'trending-up', color: 'var(--red-600)', bg: 'var(--red-50)' },
+  stable: { label: 'Stable', icon: 'minus', color: 'var(--blue-600)', bg: 'var(--blue-50)' },
+  baseline: { label: 'Baseline', icon: 'flag', color: 'var(--text-muted)', bg: 'var(--ink-50)' },
+};
+const caseRef = (id) => `C-${String(id).padStart(4, '0')}`;
+const td = { padding: '10px 14px', fontSize: 13, color: 'var(--text-body)', whiteSpace: 'nowrap' };
+const CLASSIFICATIONS = ['Trauma / Stressor-related', 'Behavioral / Conduct', 'Adjustment Disorder', 'Normal Development'];
+
+export default function ChildProgressReport() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const toast = useToast();
+  const isPsych = user?.role_name === 'Psychologist';
+  const [data, setData] = useState(null);
+  const [edit, setEdit] = useState(null);
+
+  const load = () => api.get(`/reports/child/${id}/`).then((r) => setData(r.data)).catch(() => setData('error'));
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
+
+  if (data === 'error') return <div style={PAGE}><Alert tone="danger" icon={<Icon name="alert-triangle" size={18} />}>This report is unavailable.</Alert></div>;
+  if (!data) return <div style={PAGE}><div style={{ color: 'var(--text-muted)' }}>Loading report…</div></div>;
+
+  const { child } = data;
+  const rows = data.assessments;
+  const traj = TRAJ[data.trajectory] || TRAJ.baseline;
+  const chart = rows.filter((a) => a.result && a.result.behavioral_score != null)
+    .map((a) => ({ date: a.assessment_date, score: Number(a.result.behavioral_score) }));
+  const latest = rows[rows.length - 1];
+
+  const saveEdit = async () => {
+    try {
+      await api.patch(`/assessments/${edit.id}/`, { notes: edit.notes, classification: edit.classification });
+      toast.success('Assessment updated'); setEdit(null); load();
+    } catch (err) { toast.error(err.response?.data?.detail || 'Could not update.'); }
+  };
+  const finalize = async (a) => {
+    if (!window.confirm('Finalize & submit to NACC? This permanently locks the assessment.')) return;
+    try { await api.post(`/assessments/${a.id}/finalize/`); toast.success('Assessment finalized'); load(); }
+    catch (err) { toast.error(err.response?.data?.detail || 'Could not finalize.'); }
+  };
+
+  return (
+    <div style={PAGE} className="racco-print-area">
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }} className="racco-no-print">
+        <Button variant="ghost" onClick={() => navigate('/report')} iconLeft={<Icon name="arrow-left" size={17} />}>Back to Results</Button>
+        <Button variant="secondary" onClick={() => window.print()} iconLeft={<Icon name="printer" size={17} />}>Print / Save PDF</Button>
+      </div>
+
+      <Card padding="22px" style={{ marginBottom: 18 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+          <div>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 22, color: 'var(--text-strong)' }}>{child.fullname}</div>
+            <div className="racco-mono" style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{caseRef(child.id)} · {child.case_type || '—'}</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 4 }}>
+              Psychologist: {child.psychologist_name || '—'} · {[child.barangay, child.municipality, child.province].filter(Boolean).join(', ') || '—'}
+            </div>
+          </div>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 40, padding: '0 16px', borderRadius: 'var(--radius-pill)', background: traj.bg, color: traj.color, fontWeight: 800, fontSize: 14 }}>
+            <Icon name={traj.icon} size={18} /> {traj.label}
+          </div>
+        </div>
+        <div style={{ marginTop: 12, fontSize: 13, color: 'var(--text-muted)' }}>
+          {rows.length} assessment(s) on file{latest ? ` · latest ${latest.assessment_date}` : ''}
+        </div>
+      </Card>
+
+      <Card eyebrow="Behavioral score over time" title="Trajectory" padding="20px" style={{ marginBottom: 18 }}>
+        {chart.length < 2 ? (
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Need at least two scored assessments to chart a trend.</div>
+        ) : (
+          <div style={{ width: '100%', height: 240 }}>
+            <ResponsiveContainer>
+              <LineChart data={chart} margin={{ top: 10, right: 20, bottom: 0, left: -10 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <ReferenceArea y1={0} y2={34} fill="#16a34a" fillOpacity={0.06} />
+                <ReferenceArea y1={34} y2={67} fill="#d97706" fillOpacity={0.06} />
+                <ReferenceArea y1={67} y2={100} fill="#dc2626" fillOpacity={0.06} />
+                <Line type="monotone" dataKey="score" stroke="var(--blue-600)" strokeWidth={2.5} dot={{ r: 4 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </Card>
+
+      <Card eyebrow="History" title="Assessment timeline" padding="0" style={{ marginBottom: 18 }}>
+        <div className="racco-scroll" style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', minWidth: 680, borderCollapse: 'collapse' }}>
+            <thead><tr style={{ background: 'var(--ink-50)', borderBottom: '1px solid var(--border)' }}>
+              {['Date', 'Instrument', 'Classification', 'Score', 'Priority', 'By', ''].map((h, i) => (
+                <th key={i} style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {rows.map((a) => (
+                <tr key={a.id} style={{ borderBottom: '1px solid var(--ink-100)' }}>
+                  <td style={td}>{a.assessment_date}</td>
+                  <td style={td}>{a.questionnaire_title || '—'}</td>
+                  <td style={td}>{a.result?.classification || a.classification || '—'}</td>
+                  <td style={td}>{a.result?.behavioral_score ?? '—'}</td>
+                  <td style={td}>{a.result?.priority_level || '—'}</td>
+                  <td style={td}>{a.psychologist_name}</td>
+                  <td style={td}>
+                    {isPsych && (a.is_locked
+                      ? <Badge tone="neutral" dot>Finalized</Badge>
+                      : (
+                        <div style={{ display: 'flex', gap: 6 }} className="racco-no-print">
+                          <button title="Edit notes/classification" onClick={() => setEdit({ id: a.id, notes: a.notes || '', classification: a.classification || CLASSIFICATIONS[3] })} style={iconBtn('var(--blue-600)')}><Icon name="pencil" size={14} /></button>
+                          <button title="Finalize & lock" onClick={() => finalize(a)} style={iconBtn('var(--success-600)')}><Icon name="lock" size={14} /></button>
+                        </div>
+                      ))}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {latest && (
+        <Card eyebrow="Latest assessment" title={latest.assessment_date} padding="20px">
+          {latest.result?.recommendation_text && <p style={{ fontSize: 13.5, lineHeight: 1.6, color: 'var(--text-body)', margin: '0 0 10px' }}>{latest.result.recommendation_text}</p>}
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Psychologist&apos;s notes</div>
+          <p style={{ fontSize: 13.5, lineHeight: 1.6, color: 'var(--text-strong)', margin: '4px 0 0' }}>{latest.notes || '—'}</p>
+        </Card>
+      )}
+
+      <Alert disclaimer title="Confidential." style={{ marginTop: 18 }}>Protected under RA 10173. Decision support, not a diagnosis — the licensed psychologist makes all determinations.</Alert>
+
+      {edit && (
+        <div onClick={() => setEdit(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(14,19,29,0.32)', display: 'flex', justifyContent: 'flex-end', zIndex: 70, animation: 'racco-fade-in var(--dur-base) var(--ease-out)' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: 440, maxWidth: '92%', height: '100%', background: 'var(--surface)', boxShadow: 'var(--shadow-xl)', padding: 20, display: 'flex', flexDirection: 'column', gap: 14, animation: 'racco-slide-left var(--dur-slow) var(--ease-out)' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 17, color: 'var(--text-strong)' }}>Edit assessment</div>
+            <FormField label="Classification">
+              <Select value={edit.classification} onChange={(e) => setEdit({ ...edit, classification: e.target.value })}>
+                {CLASSIFICATIONS.map((c) => <option key={c}>{c}</option>)}
+              </Select>
+            </FormField>
+            <FormField label="Psychologist's notes">
+              <textarea value={edit.notes} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} rows={9} style={{ width: '100%', resize: 'vertical', padding: '11px 13px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: 1.55 }} />
+            </FormField>
+            <Button variant="primary" onClick={saveEdit} iconLeft={<Icon name="save" size={16} />}>Save changes</Button>
+            <div style={{ fontSize: 11.5, color: 'var(--text-faint)' }}>Edits are logged. The AI score and analysis cannot be changed.</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

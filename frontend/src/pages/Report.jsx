@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { Card, Badge, Alert, Input, SeverityBadge, EmptyState, Icon, iconBtn, hoverLift, PAGE } from '../ui';
@@ -23,6 +24,7 @@ const TRIAGE = {
 
 export default function Report() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const role = user?.role_name || 'Staff';
   const staff = role === 'Staff';
   const [items, setItems] = useState([]);
@@ -33,6 +35,7 @@ export default function Report() {
 
   const rows = useMemo(() => items.map((a) => ({
     id: a.id,
+    childId: a.child,
     name: a.child_name,
     ref: caseRef(a.child),
     caseType: a.child_case_type || '—',
@@ -83,12 +86,13 @@ export default function Report() {
               </thead>
               <tbody>
                 {visible.map((r) => {
-                  const clickable = !staff;
+                  const clickable = true;
                   const triage = r.result ? TRIAGE[r.result.classification] : null;
+                  const open = () => navigate(`/report/child/${r.childId}`);
                   return (
-                    <tr key={r.id} tabIndex={clickable ? 0 : undefined} role={clickable ? 'button' : undefined} aria-label={clickable ? `View ${r.name}'s assessment result` : undefined}
-                      onClick={clickable ? () => setSel(r) : undefined}
-                      onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSel(r); } } : undefined}
+                    <tr key={r.id} tabIndex={0} role="button" aria-label={`View ${r.name}'s progress report`}
+                      onClick={open}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } }}
                       style={{ borderBottom: '1px solid var(--ink-100)', cursor: clickable ? 'pointer' : 'default', transition: 'background var(--dur-fast) var(--ease-out)' }}
                       onMouseEnter={clickable ? (e) => (e.currentTarget.style.background = 'var(--blue-50)') : undefined}
                       onMouseLeave={clickable ? (e) => (e.currentTarget.style.background = 'transparent') : undefined}>

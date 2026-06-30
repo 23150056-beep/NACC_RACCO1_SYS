@@ -96,7 +96,7 @@ class AssessmentListSerializer(serializers.ModelSerializer):
         model = Assessment
         fields = ["id", "child", "child_name", "child_case_type", "questionnaire", "questionnaire_title",
                   "psychologist_name", "assessment_type", "classification", "notes",
-                  "status", "assessment_date", "result"]
+                  "status", "assessment_date", "is_locked", "locked_at", "result"]
 
     def get_result(self, obj):
         ar = getattr(obj, "result", None)

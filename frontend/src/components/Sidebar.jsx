@@ -15,6 +15,7 @@ const NAV = [
   { to: '/assessment', label: 'Assessment', icon: 'clipboard-list', roles: ['Psychologist'] },
   { to: '/report', label: 'Assessment Results', icon: 'clipboard-check', roles: ['Administrator', 'Psychologist', 'Staff'] },
   { section: 'Governance' },
+  { to: '/reports/summary', label: 'Agency Summary', icon: 'bar-chart-3', roles: ['Administrator', 'Staff'] },
   { to: '/users', label: 'User Management', icon: 'user-cog', roles: ['Administrator'] },
   { to: '/settings', label: 'Settings', icon: 'settings', roles: ['Administrator'] },
 ];

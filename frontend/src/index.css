@@ -379,3 +379,21 @@ tr:focus-visible {
   background: var(--blue-200);
   color: var(--blue-900);
 }
+
+/* Print: hide app chrome, expand the report to full width for clean PDFs. */
+@media print {
+  aside,
+  header,
+  .racco-no-print {
+    display: none !important;
+  }
+  main {
+    overflow: visible !important;
+  }
+  .racco-print-area {
+    padding: 0 !important;
+  }
+  body {
+    background: #fff !important;
+  }
+}
