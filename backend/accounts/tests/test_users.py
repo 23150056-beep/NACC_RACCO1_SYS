@@ -1,6 +1,7 @@
 from rest_framework.test import APITestCase
 from django.contrib.auth import get_user_model
 from accounts.models import Role
+from children.models import Child
 
 User = get_user_model()
 
@@ -63,3 +64,37 @@ class UserManagementTest(APITestCase):
         names = [r["role_name"] for r in resp.data]
         self.assertIn("Administrator", names)
         self.assertIn("Staff", names)
+
+
+class PsychologistListTest(APITestCase):
+    def setUp(self):
+        self.admin_role = Role.objects.create(role_name=Role.ADMINISTRATOR)
+        self.staff_role = Role.objects.create(role_name=Role.STAFF)
+        self.psy_role = Role.objects.create(role_name=Role.PSYCHOLOGIST)
+        self.admin = User.objects.create_user(email="a@racco1.gov.ph", username="a", password="pass1234", role=self.admin_role)
+        self.staff = User.objects.create_user(email="s@racco1.gov.ph", username="s", password="pass1234", role=self.staff_role)
+        self.psy = User.objects.create_user(email="p@racco1.gov.ph", username="p", password="pass1234",
+                                            first_name="Levi", last_name="Makalaya", role=self.psy_role)
+        Child.objects.create(fullname="A", assigned_psychologist=self.psy)
+        Child.objects.create(fullname="B", assigned_psychologist=self.psy)
+        Child.objects.create(fullname="C", assigned_psychologist=self.psy, status=Child.ARCHIVED)
+
+    def _auth(self, email):
+        token = self.client.post("/api/auth/login/", {"email": email, "password": "pass1234"}).data["access"]
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer " + token)
+
+    def test_staff_can_list_psychologists_with_caseload(self):
+        self._auth("s@racco1.gov.ph")
+        resp = self.client.get("/api/psychologists/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(resp.data[0]["name"], "Levi Makalaya")
+        self.assertEqual(resp.data[0]["caseload"], 2)  # archived child not counted
+
+    def test_admin_can_list_psychologists(self):
+        self._auth("a@racco1.gov.ph")
+        self.assertEqual(self.client.get("/api/psychologists/").status_code, 200)
+
+    def test_psychologist_forbidden(self):
+        self._auth("p@racco1.gov.ph")
+        self.assertEqual(self.client.get("/api/psychologists/").status_code, 403)

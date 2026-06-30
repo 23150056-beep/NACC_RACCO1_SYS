@@ -50,8 +50,8 @@ export default function Children() {
 
   const load = () => {
     api.get('/children/').then((r) => setChildren(r.data));
-    // Only psychologists can be assigned to a record (adviser: replace Guardian).
-    api.get('/users/').then((r) => setPsychologists(r.data.filter((u) => u.role_name === 'Psychologist')));
+    // Active psychologists + current caseload (admin/staff endpoint — also lets Staff assign).
+    api.get('/psychologists/').then((r) => setPsychologists(r.data)).catch(() => {});
   };
   useEffect(() => { load(); }, []);
 
@@ -145,6 +145,18 @@ export default function Children() {
           Showing <strong style={{ color: 'var(--text-strong)' }}>{visible.length}</strong> of {rows.length} children
         </div>
       </div>
+
+      {canManage && psychologists.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 14, padding: '10px 14px', borderRadius: 'var(--radius-lg)', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+          <span className="racco-eyebrow" style={{ fontSize: 10, color: 'var(--text-muted)' }}>Psychologist caseload</span>
+          {psychologists.map((p) => (
+            <span key={p.id} title={`${p.name}: ${p.caseload} active case${p.caseload === 1 ? '' : 's'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '4px 11px', borderRadius: 'var(--radius-pill)', background: 'var(--ink-50)', border: '1px solid var(--border)', fontSize: 12.5 }}>
+              <span style={{ fontWeight: 600, color: 'var(--text-strong)' }}>{p.name}</span>
+              <span className="racco-mono" style={{ fontWeight: 800, color: p.caseload >= 5 ? 'var(--red-600)' : 'var(--blue-600)' }}>{p.caseload}</span>
+            </span>
+          ))}
+        </div>
+      )}
 
       <Card padding="0">
         {visible.length === 0 ? (
@@ -337,7 +349,7 @@ function ChildForm({ form, setForm, psychologists, error, onSubmit, onClose }) {
           <FormField label="Assign Psychologist">
             <Select value={form.psychologist || ''} onChange={(e) => setForm({ ...form, psychologist: e.target.value })}>
               <option value="">— Unassigned —</option>
-              {psychologists.map((p) => <option key={p.id} value={p.id}>{p.fullname || p.username}</option>)}
+              {psychologists.map((p) => <option key={p.id} value={p.id}>{p.name} — {p.caseload} case{p.caseload === 1 ? '' : 's'}</option>)}
             </Select>
           </FormField>
           {isEdit && form.psychologist && String(form.psychologist) !== String(form._origPsychologist) && (
