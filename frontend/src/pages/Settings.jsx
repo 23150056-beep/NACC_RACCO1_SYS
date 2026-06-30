@@ -35,7 +35,7 @@ export default function Settings() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         <Card eyebrow="Agency" title="Configuration" padding="22px">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <FormField label="Partner Agency Name"><Input value={agency} onChange={(e) => setAgency(e.target.value)} /></FormField>
+            <FormField label="RCPC"><Input value={agency} onChange={(e) => setAgency(e.target.value)} /></FormField>
             <FormField label="NACC API Endpoint" hint="Managed by the national office.">
               <Input value="https://api.nacc.gov.ph/v1/sync" disabled trailing={<Badge tone="success" size="sm">PROD</Badge>} />
             </FormField>

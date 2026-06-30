@@ -131,12 +131,6 @@ export default function Login() {
             </form>
           )}
 
-          {view === 'login' && (
-            <div style={{ marginTop: 18, padding: '11px 14px', borderRadius: 'var(--radius-md)', background: 'var(--ink-50)', border: '1px solid var(--border)', fontSize: 12.5, color: 'var(--text-muted)', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-              <Icon name="shield-check" size={16} style={{ color: 'var(--blue-600)', marginTop: 1 }} />
-              <span>Access is role-scoped and every action is logged for audit under <strong style={{ color: 'var(--text-strong)' }}>RA&nbsp;10173</strong>.</span>
-            </div>
-          )}
         </div>
       </div>
     </div>

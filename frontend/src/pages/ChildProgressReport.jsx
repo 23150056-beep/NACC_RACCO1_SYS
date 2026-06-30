@@ -138,7 +138,7 @@ export default function ChildProgressReport() {
         </Card>
       )}
 
-      <Alert disclaimer title="Confidential." style={{ marginTop: 18 }}>Protected under RA 10173. Decision support, not a diagnosis — the licensed psychologist makes all determinations.</Alert>
+      <Alert disclaimer title="Note." style={{ marginTop: 18 }}>Decision support, not a diagnosis — the licensed psychologist makes all determinations.</Alert>
 
       {edit && (
         <div onClick={() => setEdit(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(14,19,29,0.32)', display: 'flex', justifyContent: 'flex-end', zIndex: 70, animation: 'racco-fade-in var(--dur-base) var(--ease-out)' }}>

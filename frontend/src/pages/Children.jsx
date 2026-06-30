@@ -260,7 +260,6 @@ function ChildDrawer({ child, canManage, onEdit, onArchive, onClose }) {
               <span style={{ fontSize: 13.5, color: 'var(--text-strong)', fontWeight: 700, textAlign: 'right' }}>{v}</span>
             </div>
           ))}
-          <Alert disclaimer title="Confidential.">Records are protected under RA 10173. Access is logged for audit.</Alert>
         </div>
         {canManage && (
           <div style={{ padding: 16, borderTop: '1px solid var(--border)', display: 'flex', gap: 10 }}>
