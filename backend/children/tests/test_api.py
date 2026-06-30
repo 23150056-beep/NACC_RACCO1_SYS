@@ -25,7 +25,7 @@ class ChildApiTest(APITestCase):
     def test_staff_can_create_child(self):
         self._auth("staff@racco1.gov.ph", "staff1234")
         resp = self.client.post("/api/children/", {
-            "fullname": "Juan Cruz", "gender": "Male", "case_type": "Foster"})
+            "fullname": "Juan Cruz", "gender": "Male", "case_type": "Foster Care"})
         self.assertEqual(resp.status_code, 201)
         self.assertTrue(Child.objects.filter(fullname="Juan Cruz").exists())
 
@@ -35,7 +35,8 @@ class ChildApiTest(APITestCase):
         self.assertEqual(resp.status_code, 403)
 
     def test_psychologist_can_view_children(self):
-        Child.objects.create(fullname="Visible Child", case_type="Foster")
+        Child.objects.create(fullname="Visible Child", case_type="Foster Care",
+                             assigned_psychologist=self.psychologist)
         self._auth("c@racco1.gov.ph", "couns1234")
         resp = self.client.get("/api/children/")
         self.assertEqual(resp.status_code, 200)

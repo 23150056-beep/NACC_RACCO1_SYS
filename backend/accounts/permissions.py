@@ -48,9 +48,9 @@ class CanManageInstruments(BasePermission):
                     and _role_name(request) in INSTRUMENT_MANAGER_ROLES)
 
 
-# Roles allowed to take/administer assessments. Kept SEPARATE from instrument
-# management so reverting that to admin-only never blocks taking assessments.
-ASSESSMENT_TAKER_ROLES = (Role.ADMINISTRATOR, Role.PSYCHOLOGIST)
+# Roles allowed to take/administer assessments. Psychologist-only: a psychologist
+# may only assess children assigned to them using instruments they own.
+ASSESSMENT_TAKER_ROLES = (Role.PSYCHOLOGIST,)
 
 
 class CanTakeAssessments(BasePermission):

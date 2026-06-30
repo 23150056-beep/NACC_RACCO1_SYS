@@ -1,6 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from accounts.models import Role
 from accounts.permissions import RecordsAccess
 from activity.models import ActivityLog
 from activity.services import log_activity
@@ -51,3 +52,17 @@ class GuardianViewSet(_ArchivableViewSet):
 class ChildViewSet(_ArchivableViewSet):
     model = Child
     serializer_class = ChildSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        role = getattr(getattr(self.request.user, "role", None), "role_name", None)
+        if role == Role.PSYCHOLOGIST:
+            qs = qs.filter(assigned_psychologist=self.request.user)
+        return qs
+
+    def _log(self, obj, action_name):
+        # Direct child-record notifications at the child's assigned psychologist.
+        log_activity(
+            self.request.user, action_name, ActivityLog.RECORD,
+            entity_type="Child", entity_label=getattr(obj, "fullname", ""),
+            entity_id=obj.id, recipient=obj.assigned_psychologist)

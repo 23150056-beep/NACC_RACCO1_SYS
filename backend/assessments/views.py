@@ -1,4 +1,5 @@
-from rest_framework import generics, viewsets, status
+from django.db.models import Q
+from rest_framework import generics, viewsets, status, serializers
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
@@ -35,6 +36,9 @@ class QuestionnaireViewSet(viewsets.ModelViewSet):
         qs = Questionnaire.objects.all().order_by("-created_at")
         if self.request.query_params.get("include_archived") != "true":
             qs = qs.exclude(status=Questionnaire.ARCHIVED)
+        role = getattr(getattr(self.request.user, "role", None), "role_name", None)
+        if role == Role.PSYCHOLOGIST:
+            qs = qs.filter(owner=self.request.user)
         return qs
 
     def _log(self, obj, action_name):
@@ -42,7 +46,15 @@ class QuestionnaireViewSet(viewsets.ModelViewSet):
                      entity_type="Questionnaire", entity_label=obj.title, entity_id=obj.id)
 
     def perform_create(self, serializer):
-        self._log(serializer.save(), ActivityLog.CREATED)
+        role = getattr(getattr(self.request.user, "role", None), "role_name", None)
+        if role == Role.PSYCHOLOGIST:
+            obj = serializer.save(owner=self.request.user)
+        else:
+            if not serializer.validated_data.get("owner"):
+                raise serializers.ValidationError(
+                    {"owner": "Select the psychologist who owns this instrument."})
+            obj = serializer.save()
+        self._log(obj, ActivityLog.CREATED)
 
     def perform_update(self, serializer):
         self._log(serializer.save(), ActivityLog.UPDATED)
@@ -85,7 +97,11 @@ class ActiveQuestionnaireListView(generics.ListAPIView):
     serializer_class = QuestionnaireSerializer
 
     def get_queryset(self):
-        return Questionnaire.objects.filter(status=Questionnaire.ACTIVE).order_by("title")
+        qs = Questionnaire.objects.filter(status=Questionnaire.ACTIVE).order_by("title")
+        role = getattr(getattr(self.request.user, "role", None), "role_name", None)
+        if role == Role.PSYCHOLOGIST:
+            qs = qs.filter(owner=self.request.user)
+        return qs
 
 
 class AssessmentViewSet(viewsets.ModelViewSet):
@@ -103,7 +119,8 @@ class AssessmentViewSet(viewsets.ModelViewSet):
               .order_by("-assessment_date", "-id"))
         role = getattr(getattr(self.request.user, "role", None), "role_name", None)
         if role == Role.PSYCHOLOGIST:
-            qs = qs.filter(psychologist=self.request.user)
+            qs = qs.filter(child__assigned_psychologist=self.request.user).filter(
+                Q(child__assignee_sees_history=True) | Q(psychologist=self.request.user))
         return qs
 
     def get_serializer_class(self):

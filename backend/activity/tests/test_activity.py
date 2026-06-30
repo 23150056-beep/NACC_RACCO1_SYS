@@ -20,7 +20,9 @@ User = get_user_model()
 
 class ActivityApiTest(APITestCase):
     def setUp(self):
-        self.role = Role.objects.create(role_name=Role.STAFF)
+        # Admin sees the full stream (record + security), so newest-first ordering
+        # across categories is observable.
+        self.role = Role.objects.create(role_name=Role.ADMINISTRATOR)
         self.user = User.objects.create_user(
             email="staff@racco1.gov.ph", username="staff", password="staff1234",
             role=self.role)
@@ -70,7 +72,7 @@ class RecordHookTest(APITestCase):
 
     def test_create_child_logs_record_created(self):
         self.client.post("/api/children/", {
-            "fullname": "Juan Cruz", "case_type": "Foster"})
+            "fullname": "Juan Cruz", "case_type": "Foster Care"})
         logs = ActivityLog.objects.filter(category="record", action="created")
         self.assertEqual(logs.count(), 1)
         self.assertEqual(logs.first().entity_type, "Child")
@@ -81,6 +83,40 @@ class RecordHookTest(APITestCase):
         self.client.post(f"/api/children/{child.id}/archive/")
         self.assertEqual(
             ActivityLog.objects.filter(category="record", action="archived").count(), 1)
+
+
+class NotificationScopingTest(APITestCase):
+    def setUp(self):
+        self.admin_role = Role.objects.create(role_name=Role.ADMINISTRATOR)
+        self.psy_role = Role.objects.create(role_name=Role.PSYCHOLOGIST)
+        self.admin = User.objects.create_user(
+            email="a@racco1.gov.ph", username="a", password="pass1234", role=self.admin_role)
+        self.psy = User.objects.create_user(
+            email="p@racco1.gov.ph", username="p", password="pass1234", role=self.psy_role)
+
+    def _auth(self, email):
+        token = self.client.post("/api/auth/login/", {
+            "email": email, "password": "pass1234"}).data["access"]
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer " + token)
+
+    def test_assigning_child_notifies_psychologist(self):
+        self._auth("a@racco1.gov.ph")
+        self.client.post("/api/children/", {
+            "fullname": "New Kid", "case_type": "Foster Care", "psychologist": self.psy.id}, format="json")
+        self.assertTrue(
+            ActivityLog.objects.filter(recipient=self.psy, entity_type="Child").exists())
+
+    def test_psychologist_sees_only_recipient_notifications(self):
+        from activity.services import log_activity
+        child = Child.objects.create(fullname="Mine", assigned_psychologist=self.psy)
+        log_activity(self.admin, ActivityLog.CREATED, ActivityLog.RECORD,
+                     entity_type="Child", entity_label="Mine", entity_id=child.id, recipient=self.psy)
+        log_activity(self.admin, ActivityLog.CREATED, ActivityLog.USER,
+                     entity_type="User", entity_label="Someone Else")
+        self._auth("p@racco1.gov.ph")
+        resp = self.client.get("/api/activity/")
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(resp.data[0]["entity_label"], "Mine")
 
 
 class UserAndLoginHookTest(APITestCase):

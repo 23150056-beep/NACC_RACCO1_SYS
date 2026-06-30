@@ -39,6 +39,17 @@ class QuestionnaireApiTest(APITestCase):
         self.assertEqual(len(resp.data["questions"]), 2)
         self.assertEqual(Questionnaire.objects.count(), 1)
 
+    def test_psychologist_create_sets_owner_self(self):
+        self._auth("p@racco1.gov.ph")
+        self.client.post("/api/questionnaires/", self._payload(), format="json")
+        self.assertEqual(Questionnaire.objects.get().owner, self.psy)
+
+    def test_admin_create_requires_owner(self):
+        self._auth("a@racco1.gov.ph")
+        resp = self.client.post("/api/questionnaires/", self._payload(), format="json")
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("owner", resp.data)
+
     def test_admin_can_list(self):
         Questionnaire.objects.create(title="X")
         self._auth("a@racco1.gov.ph")
@@ -63,7 +74,8 @@ class QuestionnaireApiTest(APITestCase):
 
     def test_archive_hides_from_list(self):
         self._auth("a@racco1.gov.ph")
-        qid = self.client.post("/api/questionnaires/", self._payload(), format="json").data["id"]
+        qid = self.client.post("/api/questionnaires/", {**self._payload(), "owner": self.psy.id},
+                               format="json").data["id"]
         self.client.post(f"/api/questionnaires/{qid}/archive/")
         self.assertEqual(len(self.client.get("/api/questionnaires/").data), 0)
 
@@ -111,11 +123,12 @@ class AssessmentTakingTest(APITestCase):
             email="p@racco1.gov.ph", username="p", password="pass1234", role=self.psy_role)
         self.staff = User.objects.create_user(
             email="s@racco1.gov.ph", username="s", password="pass1234", role=self.staff_role)
-        self.child = Child.objects.create(fullname="Ana Lopez", case_type="Foster")
-        self.qn = Questionnaire.objects.create(title="SDQ", status="active")
+        self.child = Child.objects.create(fullname="Ana Lopez", case_type="Foster Care",
+                                          assigned_psychologist=self.psy)
+        self.qn = Questionnaire.objects.create(title="SDQ", status="active", owner=self.psy)
         self.q1 = Question.objects.create(questionnaire=self.qn, question_text="Calm?", question_type="yes_no", order=1)
         self.q2 = Question.objects.create(questionnaire=self.qn, question_text="Sleeps?", question_type="rating_scale", order=2)
-        self.draft = Questionnaire.objects.create(title="Draft one", status="draft")
+        self.draft = Questionnaire.objects.create(title="Draft one", status="draft", owner=self.psy)
 
     def _auth(self, email):
         token = self.client.post("/api/auth/login/", {
@@ -159,8 +172,9 @@ class AssessmentTakingTest(APITestCase):
         resp = self.client.post("/api/assessments/", self._assessment_payload(), format="json")
         self.assertEqual(resp.status_code, 403)
 
-    def test_psychologist_lists_only_own_assessments(self):
-        Assessment.objects.create(child=self.child, psychologist=self.admin, status="completed")
+    def test_psychologist_lists_only_assigned_childrens_assessments(self):
+        other = Child.objects.create(fullname="Other Kid", assigned_psychologist=self.admin)
+        Assessment.objects.create(child=other, psychologist=self.admin, status="completed")
         self._auth("p@racco1.gov.ph")
         self.client.post("/api/assessments/", self._assessment_payload(), format="json")
         resp = self.client.get("/api/assessments/")
@@ -172,6 +186,41 @@ class AssessmentTakingTest(APITestCase):
         self._auth("a@racco1.gov.ph")
         resp = self.client.get("/api/assessments/")
         self.assertEqual(len(resp.data), 1)
+
+    def test_take_rejects_unassigned_child(self):
+        other = Child.objects.create(fullname="Not Mine", assigned_psychologist=self.admin)
+        self._auth("p@racco1.gov.ph")
+        payload = self._assessment_payload()
+        payload["child"] = other.id
+        resp = self.client.post("/api/assessments/", payload, format="json")
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("child", resp.data)
+
+    def test_take_rejects_unowned_instrument(self):
+        foreign = Questionnaire.objects.create(title="Foreign", status="active", owner=self.admin)
+        self._auth("p@racco1.gov.ph")
+        payload = self._assessment_payload()
+        payload["questionnaire"] = foreign.id
+        resp = self.client.post("/api/assessments/", payload, format="json")
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("questionnaire", resp.data)
+
+    def test_psychologist_sees_only_owned_active_instruments(self):
+        Questionnaire.objects.create(title="Admins One", status="active", owner=self.admin)
+        self._auth("p@racco1.gov.ph")
+        titles = [q["title"] for q in self.client.get("/api/active-questionnaires/").data]
+        self.assertIn("SDQ", titles)
+        self.assertNotIn("Admins One", titles)
+
+    def test_carry_history_controls_visibility_of_prior_assessments(self):
+        Assessment.objects.create(child=self.child, psychologist=self.admin, status="completed")
+        self.child.assignee_sees_history = False
+        self.child.save()
+        self._auth("p@racco1.gov.ph")
+        self.assertEqual(len(self.client.get("/api/assessments/").data), 0)
+        self.child.assignee_sees_history = True
+        self.child.save()
+        self.assertEqual(len(self.client.get("/api/assessments/").data), 1)
 
     def test_respondent_mode_defaults_to_staff(self):
         self._auth("p@racco1.gov.ph")

@@ -14,10 +14,12 @@ class QuestionSerializer(serializers.ModelSerializer):
 
 class QuestionnaireSerializer(serializers.ModelSerializer):
     questions = QuestionSerializer(many=True, required=False)
+    owner_name = serializers.CharField(source="owner.fullname", read_only=True, default=None)
 
     class Meta:
         model = Questionnaire
-        fields = ["id", "title", "age_group", "description", "status", "questions"]
+        fields = ["id", "title", "age_group", "description", "status",
+                  "owner", "owner_name", "questions"]
 
     def _write_questions(self, questionnaire, questions):
         for i, qd in enumerate(questions):
@@ -55,6 +57,18 @@ class AssessmentWriteSerializer(serializers.ModelSerializer):
         model = Assessment
         fields = ["id", "child", "questionnaire", "assessment_type", "notes",
                   "classification", "respondent_mode", "responses"]
+
+    def validate(self, attrs):
+        # Assessment-taking is psychologist-only: enforce assigned child + owned instrument.
+        user = getattr(self.context.get("request"), "user", None)
+        uid = getattr(user, "id", None)
+        child = attrs.get("child")
+        questionnaire = attrs.get("questionnaire")
+        if child is not None and child.assigned_psychologist_id != uid:
+            raise serializers.ValidationError({"child": "That child is not assigned to you."})
+        if questionnaire is not None and questionnaire.owner_id != uid:
+            raise serializers.ValidationError({"questionnaire": "That instrument is not yours."})
+        return attrs
 
     def create(self, validated_data):
         responses = validated_data.pop("responses", [])
