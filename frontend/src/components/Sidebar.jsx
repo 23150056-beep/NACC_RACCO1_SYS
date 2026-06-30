@@ -10,12 +10,11 @@ const NAV = [
   { to: '/', label: 'Dashboard', icon: 'layout-dashboard', roles: ['Administrator', 'Psychologist', 'Staff'], end: true },
   { section: 'Casework' },
   { to: '/children', label: 'Records', icon: 'users', roles: ['Administrator', 'Psychologist', 'Staff'] },
+  { to: '/questionnaires', label: 'Assessment Instruments', icon: 'clipboard-pen', roles: INSTRUMENT_MANAGER_ROLES },
   { section: 'Clinical' },
   { to: '/assessment', label: 'Assessment', icon: 'clipboard-list', roles: ['Psychologist'] },
-  { to: '/questionnaires', label: 'Assessment Instruments', icon: 'clipboard-pen', roles: INSTRUMENT_MANAGER_ROLES },
   { to: '/report', label: 'Assessment Results', icon: 'clipboard-check', roles: ['Administrator', 'Psychologist', 'Staff'] },
   { section: 'Governance' },
-  { to: '/compliance', label: 'Compliance & Audit', icon: 'shield-check', roles: ['Administrator', 'Psychologist', 'Staff'] },
   { to: '/users', label: 'User Management', icon: 'user-cog', roles: ['Administrator'] },
   { to: '/settings', label: 'Settings', icon: 'settings', roles: ['Administrator'] },
 ];

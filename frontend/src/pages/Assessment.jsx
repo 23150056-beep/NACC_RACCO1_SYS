@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { useActivity } from '../context/ActivityContext';
 import { Card, Button, Alert, Select, FormField, ProgressSteps, Icon, PAGE, hoverLift } from '../ui';
@@ -22,6 +23,7 @@ function deriveSessionType(form) {
 export default function Assessment() {
   const { refresh: refreshActivity } = useActivity();
   const toast = useToast();
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [children, setChildren] = useState([]);
   const [forms, setForms] = useState([]); // active questionnaires
@@ -97,6 +99,9 @@ export default function Assessment() {
   return (
     <div style={PAGE}>
       <div style={{ maxWidth: 760, margin: '0 auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+          <Button variant="secondary" onClick={() => navigate('/report')} iconLeft={<Icon name="clipboard-check" size={17} />}>View Results</Button>
+        </div>
         <Card padding="28px">
           <div style={{ marginBottom: 26 }}>
             <ProgressSteps steps={['Select Child', 'Instrument', 'Responses', 'Review & Sign']} current={step} />
@@ -173,6 +178,18 @@ export default function Assessment() {
               {childObj && <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 14px' }}>For <strong style={{ color: 'var(--text-strong)' }}>{childObj.fullname}</strong> · <span className="racco-mono">{caseRef(childObj.id)}</span> · {form?.title} · {stype}</p>}
 
               <AnalysisPanel analyzing={analyzing} analysis={analysis} />
+
+              <div style={{ marginBottom: 16, border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+                <div className="racco-eyebrow" style={{ fontSize: 10, padding: '10px 14px', background: 'var(--ink-50)', borderBottom: '1px solid var(--border)' }}>Responses reviewed</div>
+                <div style={{ padding: '4px 14px' }}>
+                  {questions.map((q, i) => (
+                    <div key={q.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0', borderBottom: i < questions.length - 1 ? '1px solid var(--ink-100)' : 'none' }}>
+                      <span style={{ fontSize: 13, color: 'var(--text-body)' }}>{i + 1}. {q.question_text}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-strong)', whiteSpace: 'nowrap' }}>{answers[q.id] || '—'}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
               {analysis?.flagged && (
                 <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 'var(--radius-lg)', background: 'var(--red-50)', border: '1px solid var(--red-100)' }}>

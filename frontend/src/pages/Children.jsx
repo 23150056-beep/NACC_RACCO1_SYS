@@ -32,7 +32,7 @@ function caseRef(id) {
   return `C-${String(id).padStart(4, '0')}`;
 }
 
-const EMPTY = { fullname: '', birth_date: '', gender: '', province: '', municipality: '', barangay: '', case_type: '', surrendered_by: '', psychologist: '' };
+const EMPTY = { fullname: '', birth_date: '', gender: '', province: '', municipality: '', barangay: '', case_type: '', surrendered_by: '', psychologist: '', assignee_sees_history: true };
 
 export default function Children() {
   const { user } = useAuth();
@@ -82,13 +82,13 @@ export default function Children() {
   const td = { padding: '11px 16px', fontSize: 13, color: 'var(--text-body)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
 
   const openCreate = () => { setError(''); setForm({ ...EMPTY }); };
-  const openEdit = (c) => { setError(''); setForm({ ...EMPTY, ...c, psychologist: c.psychologist || '' }); };
+  const openEdit = (c) => { setError(''); setForm({ ...EMPTY, ...c, psychologist: c.psychologist || '', _origPsychologist: c.psychologist || '' }); };
 
   const save = async (e) => {
     e.preventDefault();
     setError('');
     const payload = { ...form };
-    delete payload.severity; delete payload.age; delete payload.group; delete payload.ref; delete payload.psychologist_name; delete payload.guardian_name;
+    delete payload.severity; delete payload.age; delete payload.group; delete payload.ref; delete payload.psychologist_name; delete payload.guardian_name; delete payload._origPsychologist;
     if (!payload.psychologist) payload.psychologist = null;
     if (!payload.birth_date) delete payload.birth_date;
     try {
@@ -328,6 +328,14 @@ function ChildForm({ form, setForm, psychologists, error, onSubmit, onClose }) {
               {psychologists.map((p) => <option key={p.id} value={p.id}>{p.fullname || p.username}</option>)}
             </Select>
           </FormField>
+          {isEdit && form.psychologist && String(form.psychologist) !== String(form._origPsychologist) && (
+            <div style={{ padding: '11px 13px', borderRadius: 'var(--radius-md)', background: 'var(--blue-50)', border: '1px solid var(--blue-200)' }}>
+              <label style={{ display: 'flex', gap: 9, alignItems: 'flex-start', fontSize: 12.5, color: 'var(--text-strong)', cursor: 'pointer' }}>
+                <input type="checkbox" checked={form.assignee_sees_history !== false} onChange={(e) => setForm({ ...form, assignee_sees_history: e.target.checked })} style={{ marginTop: 2, accentColor: 'var(--blue-600)' }} />
+                <span>Carry this child&apos;s assessment history to the new psychologist (they&apos;ll see prior assessments). Uncheck to give them a fresh start.</span>
+              </label>
+            </div>
+          )}
         </div>
         <div style={{ padding: 16, borderTop: '1px solid var(--border)' }}>
           <Button type="submit" variant="primary" fullWidth iconLeft={<Icon name="save" size={16} />}>Save Record</Button>

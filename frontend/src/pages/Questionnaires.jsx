@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import api from '../api/client';
 import { useActivity } from '../context/ActivityContext';
+import { useAuth } from '../context/AuthContext';
 import { Card, Button, Badge, Input, Select, FormField, Alert, EmptyState, Icon, iconBtn, hoverLift, PAGE } from '../ui';
 import { useToast } from '../context/ToastContext';
 
@@ -13,12 +14,15 @@ const TYPES = [
 const HAS_OPTIONS = (t) => t === 'multiple_choice' || t === 'emotion';
 const STATUS_TONE = { draft: 'neutral', active: 'success', archived: 'amber' };
 const blankQuestion = (order) => ({ question_text: '', question_type: 'rating_scale', options: [], concern_direction: 'higher', concern_options: [], order });
-const blankForm = () => ({ title: '', age_group: '', description: '', status: 'draft', questions: [blankQuestion(1)] });
+const blankForm = () => ({ title: '', age_group: '', description: '', status: 'draft', owner: '', questions: [blankQuestion(1)] });
 
 export default function Questionnaires() {
   const { refresh: refreshActivity } = useActivity();
+  const { user } = useAuth();
+  const isAdmin = user?.role_name === 'Administrator';
   const toast = useToast();
   const [items, setItems] = useState([]);
+  const [psychologists, setPsychologists] = useState([]);
   const [form, setForm] = useState(null);
   const [banner, setBanner] = useState('');
   const [error, setError] = useState('');
@@ -26,7 +30,11 @@ export default function Questionnaires() {
   const fileRef = useRef(null);
 
   const load = () => api.get('/questionnaires/').then((r) => setItems(r.data)).catch(() => {});
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    // Admins assign an owning psychologist when creating an instrument.
+    if (isAdmin) api.get('/users/').then((r) => setPsychologists(r.data.filter((u) => u.role_name === 'Psychologist'))).catch(() => {});
+  }, [isAdmin]);
 
   const openCreate = () => { setError(''); setBanner(''); setForm(blankForm()); };
   const openEdit = (qn) => {
@@ -77,8 +85,10 @@ export default function Questionnaires() {
         .filter((q) => q.question_text.trim())
         .map((q, i) => ({ question_text: q.question_text, question_type: q.question_type, options: HAS_OPTIONS(q.question_type) ? q.options : [], concern_direction: q.concern_direction || 'higher', concern_options: HAS_OPTIONS(q.question_type) ? (q.concern_options || []) : [], order: i + 1 })),
     };
+    if (isAdmin) payload.owner = form.owner || null;
     if (!payload.title.trim()) { setError('Title is required.'); return; }
     if (payload.questions.length === 0) { setError('Add at least one question.'); return; }
+    if (isAdmin && !form.owner) { setError('Select the owning psychologist.'); return; }
     try {
       if (form.id) await api.put(`/questionnaires/${form.id}/`, payload);
       else await api.post('/questionnaires/', payload);
@@ -122,7 +132,7 @@ export default function Questionnaires() {
             <table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--ink-50)', borderBottom: '1px solid var(--border)' }}>
-                  {['Title', 'Age Group', 'Questions', 'Status', 'Actions'].map((h) => (
+                  {['Title', 'Age Group', 'Questions', ...(isAdmin ? ['Owner'] : []), 'Status', 'Actions'].map((h) => (
                     <th key={h} scope="col" style={{ textAlign: 'left', padding: '12px 16px', fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -133,6 +143,7 @@ export default function Questionnaires() {
                     <td style={{ padding: '12px 16px', fontWeight: 700, fontSize: 13.5, color: 'var(--text-strong)' }}>{qn.title}</td>
                     <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-body)' }}>{qn.age_group || '—'}</td>
                     <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-muted)' }}>{qn.questions?.length ?? 0}</td>
+                    {isAdmin && <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-body)' }}>{qn.owner_name || '—'}</td>}
                     <td style={{ padding: '12px 16px' }}><Badge tone={STATUS_TONE[qn.status] || 'neutral'} dot>{qn.status}</Badge></td>
                     <td style={{ padding: '12px 16px' }}>
                       <div style={{ display: 'flex', gap: 6 }}>
@@ -165,6 +176,14 @@ export default function Questionnaires() {
                 <FormField label="Status"><Select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option value="draft">Draft</option><option value="active">Active</option></Select></FormField>
               </div>
               <FormField label="Description"><Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></FormField>
+              {isAdmin && (
+                <FormField label="Owner (psychologist)" required>
+                  <Select value={form.owner || ''} onChange={(e) => setForm({ ...form, owner: e.target.value })}>
+                    <option value="">— Select psychologist —</option>
+                    {psychologists.map((p) => <option key={p.id} value={p.id}>{p.fullname || p.username}</option>)}
+                  </Select>
+                </FormField>
+              )}
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
                 <div className="racco-eyebrow" style={{ fontSize: 11 }}>Questions ({form.questions.length})</div>

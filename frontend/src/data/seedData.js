@@ -40,12 +40,6 @@ export const questions = [
   'The child avoids talking about home, family, or past experiences.',
 ];
 
-export const compliance = [
-  { law: 'RA 10173', name: 'Data Privacy Act', status: 'Compliant', tone: 'success', note: 'Data encryption verified. Parent consent forms digitized and catalogued.' },
-  { law: 'RA 11642', name: 'Domestic Administrative Adoption', status: 'Action Needed', tone: 'warning', note: 'Missing CDCLAA for 2 ongoing cases (C-1001, C-1005).' },
-  { law: 'RA 12199', name: 'Alternative Child Care Act', status: 'Compliant', tone: 'success', note: 'Foster care matching aligned with updated DSWD/NACC guidelines.' },
-];
-
 // Shared assessment-results narrative meta, cycled across children for the read-only browser.
 export const resultMeta = [
   { psychologist: 'Marco Villanueva', date: 'Jun 23, 2026', note: 'Persistent hypervigilance and disrupted sleep noted across two sessions. Recommending trauma-focused CBT and weekly check-ins; coordinate with house parent on bedtime routine.' },

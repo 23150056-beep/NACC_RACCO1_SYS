@@ -10,7 +10,6 @@ const SCREEN_TITLES = {
   '/assessment': ['Assessment', 'Assessment instrument, AI analysis & clinical notes'],
   '/questionnaires': ['Assessment Instruments', 'Build & manage assessment instruments'],
   '/report': ['Assessment Results', 'Shared counseling outcomes for continuity of care'],
-  '/compliance': ['Compliance & Audit', 'Regulatory status & exportable records'],
   '/users': ['User Management', 'Accounts & roles'],
   '/settings': ['System Settings', 'Agency configuration & AI engine'],
 };
@@ -58,6 +57,11 @@ export default function Topbar() {
   const [notifTab, setNotifTab] = useState('all');
   const unread = unreadCount;
   const shownEvents = events.filter((e) => notifTab === 'all' || e.category === notifTab);
+  // Role-aware notification tabs: psychologists only see their own (All); staff see
+  // the case stream (All/Records); admin sees every category.
+  const notifTabs = role === 'Administrator' ? NOTIF_TABS
+    : role === 'Staff' ? NOTIF_TABS.filter((t) => ['all', 'record'].includes(t.key))
+    : NOTIF_TABS.filter((t) => t.key === 'all');
 
   const handleLogout = () => { logout(); navigate('/login'); };
 
@@ -94,7 +98,7 @@ export default function Topbar() {
                 <span className="racco-eyebrow" style={{ fontSize: 10 }}>{unread} new</span>
               </div>
               <div style={{ display: 'flex', gap: 4, padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
-                {NOTIF_TABS.map((t) => {
+                {notifTabs.map((t) => {
                   const on = notifTab === t.key;
                   return (
                     <button key={t.key} onClick={() => setNotifTab(t.key)} style={{ flex: 1, padding: '5px 6px', borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 11.5, background: on ? 'var(--blue-50)' : 'transparent', color: on ? 'var(--blue-700)' : 'var(--text-muted)', transition: 'var(--transition-base)' }}>{t.label}</button>

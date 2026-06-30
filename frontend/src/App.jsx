@@ -12,7 +12,6 @@ import Dashboard from './pages/Dashboard';
 import Children from './pages/Children';
 import Assessment from './pages/Assessment';
 import Report from './pages/Report';
-import Compliance from './pages/Compliance';
 import Settings from './pages/Settings';
 import Users from './pages/Users';
 import Questionnaires from './pages/Questionnaires';
@@ -42,7 +41,6 @@ export default function App() {
           <Route path="/assessment" element={<ProtectedRoute roles={['Psychologist']}><Shell><Assessment /></Shell></ProtectedRoute>} />
           <Route path="/questionnaires" element={<ProtectedRoute roles={INSTRUMENT_MANAGER_ROLES}><Shell><Questionnaires /></Shell></ProtectedRoute>} />
           <Route path="/report" element={<ProtectedRoute><Shell><Report /></Shell></ProtectedRoute>} />
-          <Route path="/compliance" element={<ProtectedRoute><Shell><Compliance /></Shell></ProtectedRoute>} />
           <Route path="/users" element={<ProtectedRoute roles={['Administrator']}><Shell><Users /></Shell></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute roles={['Administrator']}><Shell><Settings /></Shell></ProtectedRoute>} />
           </Routes>
