@@ -140,3 +140,79 @@ class AssessmentEditTest(APITestCase):
         self.assertTrue(self.a.is_locked)
         resp = self.client.patch(f"/api/assessments/{self.a.id}/", {"notes": "late"}, format="json")
         self.assertEqual(resp.status_code, 400)
+
+
+class MonitoringApiTest(APITestCase):
+    def setUp(self):
+        self.admin_role = Role.objects.create(role_name=Role.ADMINISTRATOR)
+        self.psy_role = Role.objects.create(role_name=Role.PSYCHOLOGIST)
+        self.staff_role = Role.objects.create(role_name=Role.STAFF)
+        self.admin = User.objects.create_user(
+            email="a@racco1.gov.ph", username="a", password="pass1234", role=self.admin_role)
+        self.psy = User.objects.create_user(
+            email="p@racco1.gov.ph", username="p", password="pass1234", role=self.psy_role)
+        self.other = User.objects.create_user(
+            email="o@racco1.gov.ph", username="o", password="pass1234", role=self.psy_role)
+        self.staff = User.objects.create_user(
+            email="s@racco1.gov.ph", username="s", password="pass1234", role=self.staff_role)
+        # Assigned to psy, two assessments 60 -> 50 (improving).
+        self.mine = Child.objects.create(
+            fullname="Ana", case_type="Foster Care", assigned_psychologist=self.psy)
+        a1 = Assessment.objects.create(child=self.mine, psychologist=self.psy, status="completed")
+        _result(a1, 60, "Needs Counseling Attention", "High")
+        a2 = Assessment.objects.create(child=self.mine, psychologist=self.psy, status="completed")
+        _result(a2, 50, "Needs Monitoring", "Medium")
+        # Assigned to a different psychologist.
+        self.theirs = Child.objects.create(fullname="Ben", assigned_psychologist=self.other)
+        a3 = Assessment.objects.create(child=self.theirs, psychologist=self.other, status="completed")
+        _result(a3, 40, "Normal", "Low")
+        # Assigned to psy but never assessed.
+        self.fresh = Child.objects.create(fullname="Cara", assigned_psychologist=self.psy)
+        # Archived — must never appear.
+        self.gone = Child.objects.create(
+            fullname="Zed", assigned_psychologist=self.psy, status=Child.ARCHIVED)
+
+    def _auth(self, email):
+        token = self.client.post("/api/auth/login/", {
+            "email": email, "password": "pass1234"}).data["access"]
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer " + token)
+
+    def test_admin_sees_all_active_children_sorted(self):
+        self._auth("a@racco1.gov.ph")
+        resp = self.client.get("/api/reports/monitoring/")
+        self.assertEqual(resp.status_code, 200)
+        names = [r["child_name"] for r in resp.data]
+        self.assertEqual(names, ["Ana", "Ben", "Cara"])  # sorted, Zed excluded
+
+    def test_staff_sees_all_active_children(self):
+        self._auth("s@racco1.gov.ph")
+        resp = self.client.get("/api/reports/monitoring/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 3)
+
+    def test_psychologist_sees_only_assigned(self):
+        self._auth("p@racco1.gov.ph")
+        resp = self.client.get("/api/reports/monitoring/")
+        self.assertEqual(resp.status_code, 200)
+        names = [r["child_name"] for r in resp.data]
+        self.assertEqual(names, ["Ana", "Cara"])  # Ben (other psy) and Zed (archived) excluded
+
+    def test_assessed_row_has_trajectory_and_latest(self):
+        self._auth("a@racco1.gov.ph")
+        resp = self.client.get("/api/reports/monitoring/")
+        ana = next(r for r in resp.data if r["child_name"] == "Ana")
+        self.assertEqual(ana["trajectory"], "improving")        # 60 -> 50
+        self.assertEqual(ana["latest_score"], 50.0)
+        self.assertEqual(ana["latest_classification"], "Needs Monitoring")
+        self.assertEqual(ana["assessment_count"], 2)
+        self.assertEqual(ana["case_ref"], f"C-{self.mine.id:04d}")
+        self.assertIsNotNone(ana["last_assessment_date"])
+
+    def test_unassessed_child_is_baseline(self):
+        self._auth("p@racco1.gov.ph")
+        resp = self.client.get("/api/reports/monitoring/")
+        cara = next(r for r in resp.data if r["child_name"] == "Cara")
+        self.assertEqual(cara["trajectory"], "baseline")
+        self.assertIsNone(cara["latest_score"])
+        self.assertIsNone(cara["latest_classification"])
+        self.assertEqual(cara["assessment_count"], 0)

@@ -273,6 +273,58 @@ class ChildReportView(generics.GenericAPIView):
         })
 
 
+class MonitoringListView(generics.GenericAPIView):
+    """Per-child progress overview for the Progress Monitoring page, role-scoped:
+    admin/staff -> all active children; psychologist -> their assigned children.
+    Read-only; reuses reports.trajectory(). No new model."""
+    permission_classes = [CanViewResults]
+
+    def get(self, request):
+        role = getattr(getattr(request.user, "role", None), "role_name", None)
+        children = (Child.objects.exclude(status=Child.ARCHIVED)
+                    .select_related("assigned_psychologist"))
+        if role == Role.PSYCHOLOGIST:
+            children = children.filter(assigned_psychologist=request.user)
+        children = list(children)
+
+        child_ids = [c.id for c in children]
+        assessments = (Assessment.objects.filter(child_id__in=child_ids)
+                       .select_related("result")
+                       .order_by("assessment_date", "id"))
+        by_child = {}
+        for a in assessments:
+            by_child.setdefault(a.child_id, []).append(a)
+
+        rows = []
+        for c in children:
+            items = by_child.get(c.id, [])
+            scores = [getattr(a, "result", None).behavioral_score
+                      if getattr(a, "result", None) else None for a in items]
+            latest = items[-1] if items else None
+            latest_result = getattr(latest, "result", None) if latest else None
+            if c.assigned_psychologist_id:
+                psy = c.assigned_psychologist
+                psy_name = (getattr(psy, "fullname", "") or getattr(psy, "username", "")) or None
+            else:
+                psy_name = None
+            score = (float(latest_result.behavioral_score)
+                     if latest_result and latest_result.behavioral_score is not None else None)
+            rows.append({
+                "child_id": c.id,
+                "child_name": c.fullname,
+                "case_ref": f"C-{c.id:04d}",
+                "case_type": c.case_type or None,
+                "psychologist_name": psy_name,
+                "latest_classification": latest_result.classification if latest_result else None,
+                "latest_score": score,
+                "trajectory": reports.trajectory(scores),
+                "last_assessment_date": latest.assessment_date if latest else None,
+                "assessment_count": len(items),
+            })
+        rows.sort(key=lambda r: (r["child_name"] or "").lower())
+        return Response(rows)
+
+
 def _summary_csv(data):
     import csv
     from django.http import HttpResponse
