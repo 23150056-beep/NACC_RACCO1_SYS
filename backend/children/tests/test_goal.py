@@ -15,6 +15,8 @@ class GoalApiTest(APITestCase):
         self.psy = User.objects.create_user(email="p@racco1.gov.ph", username="p", password="pass1234", role=self.psy_role)
         self.staff = User.objects.create_user(email="s@racco1.gov.ph", username="s", password="pass1234", role=self.staff_role)
         self.mine = Child.objects.create(fullname="Ana", assigned_psychologist=self.psy)
+        self.other = User.objects.create_user(email="o@racco1.gov.ph", username="o", password="pass1234", role=self.psy_role)
+        self.theirs = Child.objects.create(fullname="Ben", assigned_psychologist=self.other)
 
     def _auth(self, email):
         token = self.client.post("/api/auth/login/", {"email": email, "password": "pass1234"}).data["access"]
@@ -44,3 +46,16 @@ class GoalApiTest(APITestCase):
         self._auth("a@racco1.gov.ph")
         resp = self.client.post("/api/goals/", {"child": self.mine.id, "text": "Admin goal"}, format="json")
         self.assertEqual(resp.status_code, 201)
+
+    def test_psychologist_cannot_write_to_unassigned_child(self):
+        self._auth("p@racco1.gov.ph")
+        resp = self.client.post("/api/goals/", {"child": self.theirs.id, "text": "x"}, format="json")
+        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(Goal.objects.count(), 0)
+
+    def test_psychologist_list_scoped_to_assigned(self):
+        Goal.objects.create(child=self.mine, author=self.psy, text="mine")
+        Goal.objects.create(child=self.theirs, author=self.other, text="theirs")
+        self._auth("p@racco1.gov.ph")
+        resp = self.client.get("/api/goals/")
+        self.assertEqual(len(resp.data), 1)
