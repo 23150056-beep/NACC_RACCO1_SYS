@@ -113,7 +113,7 @@ class AssessmentViewSet(viewsets.ModelViewSet):
     pagination_class = None
 
     def get_permissions(self):
-        if self.action in ("list", "retrieve"):
+        if self.action in ("list", "retrieve", "schedule"):
             return [CanViewResults()]
         return [CanTakeAssessments()]
 
@@ -217,6 +217,18 @@ class AssessmentViewSet(viewsets.ModelViewSet):
                      entity_id=assessment.id, recipient=assessment.child.assigned_psychologist)
         return Response(AssessmentListSerializer(assessment).data)
 
+    @action(detail=True, methods=["patch"])
+    def schedule(self, request, pk=None):
+        assessment = self.get_object()
+        role = getattr(getattr(request.user, "role", None), "role_name", None)
+        allowed = (role == Role.ADMINISTRATOR) or (assessment.psychologist_id == request.user.id)
+        if not allowed:
+            return Response({"detail": "You cannot schedule this assessment."},
+                            status=status.HTTP_403_FORBIDDEN)
+        assessment.next_session = request.data.get("next_session") or None
+        assessment.save(update_fields=["next_session", "updated_at"])
+        return Response(AssessmentListSerializer(assessment).data)
+
     @action(detail=True, methods=["post"])
     def finalize(self, request, pk=None):
         from django.utils import timezone
@@ -318,6 +330,7 @@ class MonitoringListView(generics.GenericAPIView):
                 "latest_classification": latest_result.classification if latest_result else None,
                 "latest_score": score,
                 "trajectory": reports.trajectory(scores),
+                "next_session": str(latest.next_session) if latest and latest.next_session else None,
                 "last_assessment_date": latest.assessment_date if latest else None,
                 "assessment_count": len(items),
             })

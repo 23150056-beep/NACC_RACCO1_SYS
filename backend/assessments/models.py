@@ -58,6 +58,7 @@ class Assessment(models.Model):
     # Editable-with-audit: a signed assessment locks on finalize/export.
     is_locked = models.BooleanField(default=False)
     locked_at = models.DateTimeField(null=True, blank=True)
+    next_session = models.DateField(null=True, blank=True)
     STAFF, CHILD = "staff", "child"
     RESPONDENT_CHOICES = [(STAFF, "Staff"), (CHILD, "Child")]
     respondent_mode = models.CharField(max_length=10, choices=RESPONDENT_CHOICES, default=STAFF)

@@ -216,3 +216,43 @@ class MonitoringApiTest(APITestCase):
         self.assertIsNone(cara["latest_score"])
         self.assertIsNone(cara["latest_classification"])
         self.assertEqual(cara["assessment_count"], 0)
+
+
+class NextSessionTest(APITestCase):
+    def setUp(self):
+        self.admin_role = Role.objects.create(role_name=Role.ADMINISTRATOR)
+        self.psy_role = Role.objects.create(role_name=Role.PSYCHOLOGIST)
+        self.admin = User.objects.create_user(email="a@racco1.gov.ph", username="a", password="pass1234", role=self.admin_role)
+        self.psy = User.objects.create_user(email="p@racco1.gov.ph", username="p", password="pass1234", role=self.psy_role)
+        self.other = User.objects.create_user(email="o@racco1.gov.ph", username="o", password="pass1234", role=self.psy_role)
+        self.child = Child.objects.create(fullname="Ana", assigned_psychologist=self.psy)
+        self.a = Assessment.objects.create(child=self.child, psychologist=self.psy, status="completed")
+        _result(self.a, 50, "Needs Monitoring", "Medium")
+
+    def _auth(self, email):
+        token = self.client.post("/api/auth/login/", {"email": email, "password": "pass1234"}).data["access"]
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer " + token)
+
+    def test_owner_psychologist_can_schedule(self):
+        self._auth("p@racco1.gov.ph")
+        resp = self.client.patch(f"/api/assessments/{self.a.id}/schedule/", {"next_session": "2026-08-01"}, format="json")
+        self.assertEqual(resp.status_code, 200)
+        self.a.refresh_from_db()
+        self.assertEqual(str(self.a.next_session), "2026-08-01")
+
+    def test_admin_can_schedule(self):
+        self._auth("a@racco1.gov.ph")
+        resp = self.client.patch(f"/api/assessments/{self.a.id}/schedule/", {"next_session": "2026-08-02"}, format="json")
+        self.assertEqual(resp.status_code, 200)
+
+    def test_unrelated_psychologist_cannot_schedule(self):
+        self._auth("o@racco1.gov.ph")
+        resp = self.client.patch(f"/api/assessments/{self.a.id}/schedule/", {"next_session": "2026-08-03"}, format="json")
+        self.assertIn(resp.status_code, (403, 404))
+
+    def test_monitoring_includes_next_session(self):
+        self.a.next_session = "2026-08-05"; self.a.save()
+        self._auth("a@racco1.gov.ph")
+        resp = self.client.get("/api/reports/monitoring/")
+        ana = next(r for r in resp.data if r["child_name"] == "Ana")
+        self.assertEqual(ana["next_session"], "2026-08-05")
