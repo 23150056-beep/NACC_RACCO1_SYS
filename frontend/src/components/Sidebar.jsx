@@ -13,6 +13,7 @@ const NAV = [
   { to: '/questionnaires', label: 'Assessment Instruments', icon: 'clipboard-pen', roles: INSTRUMENT_MANAGER_ROLES },
   { section: 'Clinical' },
   { to: '/assessment', label: 'Assessment', icon: 'clipboard-list', roles: ['Psychologist'] },
+  { to: '/monitoring', label: 'Progress Monitoring', icon: 'activity', roles: ['Administrator', 'Psychologist', 'Staff'] },
   { to: '/report', label: 'Assessment Results', icon: 'clipboard-check', roles: ['Administrator', 'Psychologist', 'Staff'] },
   { section: 'Governance' },
   { to: '/reports/summary', label: 'Agency Summary', icon: 'bar-chart-3', roles: ['Administrator', 'Staff'] },

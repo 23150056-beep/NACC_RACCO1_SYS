@@ -13,6 +13,7 @@ import Children from './pages/Children';
 import Assessment from './pages/Assessment';
 import Report from './pages/Report';
 import ChildProgressReport from './pages/ChildProgressReport';
+import Monitoring from './pages/Monitoring';
 import AgencySummary from './pages/AgencySummary';
 import Settings from './pages/Settings';
 import Users from './pages/Users';
@@ -44,6 +45,7 @@ export default function App() {
           <Route path="/questionnaires" element={<ProtectedRoute roles={INSTRUMENT_MANAGER_ROLES}><Shell><Questionnaires /></Shell></ProtectedRoute>} />
           <Route path="/report" element={<ProtectedRoute><Shell><Report /></Shell></ProtectedRoute>} />
           <Route path="/report/child/:id" element={<ProtectedRoute><Shell><ChildProgressReport /></Shell></ProtectedRoute>} />
+          <Route path="/monitoring" element={<ProtectedRoute roles={['Administrator', 'Staff', 'Psychologist']}><Shell><Monitoring /></Shell></ProtectedRoute>} />
           <Route path="/reports/summary" element={<ProtectedRoute roles={['Administrator', 'Staff']}><Shell><AgencySummary /></Shell></ProtectedRoute>} />
           <Route path="/users" element={<ProtectedRoute roles={['Administrator']}><Shell><Users /></Shell></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute roles={['Administrator']}><Shell><Settings /></Shell></ProtectedRoute>} />
