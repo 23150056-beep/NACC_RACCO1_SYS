@@ -25,6 +25,26 @@ export default function ChildProgressReport() {
   const [data, setData] = useState(null);
   const [edit, setEdit] = useState(null);
 
+  const canWrite = ['Administrator', 'Psychologist'].includes(user?.role_name);
+  const [notes, setNotes] = useState([]);
+  const [noteText, setNoteText] = useState('');
+
+  const loadNotes = () => api.get(`/progress-notes/?child=${id}`).then((r) => setNotes(r.data)).catch(() => {});
+  useEffect(() => { loadNotes(); /* eslint-disable-next-line */ }, [id]);
+
+  const addNote = async () => {
+    if (!noteText.trim()) return;
+    try {
+      await api.post('/progress-notes/', { child: Number(id), text: noteText.trim() });
+      setNoteText(''); loadNotes(); toast.success('Progress note added');
+    } catch (err) { toast.error(err.response?.data?.detail || 'Could not add note.'); }
+  };
+  const deleteNote = async (noteId) => {
+    if (!window.confirm('Delete this progress note?')) return;
+    try { await api.delete(`/progress-notes/${noteId}/`); loadNotes(); toast.success('Note deleted'); }
+    catch (err) { toast.error(err.response?.data?.detail || 'Could not delete.'); }
+  };
+
   const load = () => api.get(`/reports/child/${id}/`).then((r) => setData(r.data)).catch(() => setData('error'));
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 
@@ -137,6 +157,33 @@ export default function ChildProgressReport() {
           <p style={{ fontSize: 13.5, lineHeight: 1.6, color: 'var(--text-strong)', margin: '4px 0 0' }}>{latest.notes || '—'}</p>
         </Card>
       )}
+
+      <Card eyebrow="Progress log" title="Session notes" padding="20px" style={{ marginTop: 18 }}>
+        {canWrite && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: notes.length ? 18 : 0 }} className="racco-no-print">
+            <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} rows={3} placeholder="Add a dated progress note for this child…"
+              style={{ width: '100%', resize: 'vertical', padding: '11px 13px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: 1.55 }} />
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button variant="primary" onClick={addNote} iconLeft={<Icon name="plus" size={16} />} disabled={!noteText.trim()}>Add note</Button>
+            </div>
+          </div>
+        )}
+        {notes.length === 0 ? (
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>No progress notes yet.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {notes.map((n) => (
+              <div key={n.id} style={{ borderLeft: '3px solid var(--blue-200)', paddingLeft: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>{n.date} · {n.author_name || '—'}</div>
+                  {canWrite && <button title="Delete note" onClick={() => deleteNote(n.id)} className="racco-no-print" style={iconBtn('var(--red-500)')}><Icon name="trash-2" size={14} /></button>}
+                </div>
+                <p style={{ fontSize: 13.5, lineHeight: 1.6, color: 'var(--text-strong)', margin: '4px 0 0' }}>{n.text}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
 
       <Alert disclaimer title="Note." style={{ marginTop: 18 }}>Decision support, not a diagnosis — the licensed psychologist makes all determinations.</Alert>
 
