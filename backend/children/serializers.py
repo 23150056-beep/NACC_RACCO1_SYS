@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from children.models import Guardian, Child, ProgressNote
+from children.models import Guardian, Child, ProgressNote, Goal
 
 User = get_user_model()
 
@@ -42,4 +42,13 @@ class ProgressNoteSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProgressNote
         fields = ["id", "child", "author", "author_name", "date", "text", "created_at", "updated_at"]
+        read_only_fields = ["author"]
+
+
+class GoalSerializer(serializers.ModelSerializer):
+    author_name = serializers.CharField(source="author.fullname", read_only=True, default=None)
+
+    class Meta:
+        model = Goal
+        fields = ["id", "child", "author", "author_name", "text", "status", "target_date", "created_at", "updated_at"]
         read_only_fields = ["author"]
