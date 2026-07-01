@@ -225,7 +225,15 @@ class AssessmentViewSet(viewsets.ModelViewSet):
         if not allowed:
             return Response({"detail": "You cannot schedule this assessment."},
                             status=status.HTTP_403_FORBIDDEN)
-        assessment.next_session = request.data.get("next_session") or None
+        raw = request.data.get("next_session")
+        if raw:
+            try:
+                assessment.next_session = serializers.DateField().to_internal_value(raw)
+            except serializers.ValidationError:
+                return Response({"detail": "Invalid date. Use YYYY-MM-DD."},
+                                status=status.HTTP_400_BAD_REQUEST)
+        else:
+            assessment.next_session = None
         assessment.save(update_fields=["next_session", "updated_at"])
         return Response(AssessmentListSerializer(assessment).data)
 
@@ -330,7 +338,8 @@ class MonitoringListView(generics.GenericAPIView):
                 "latest_classification": latest_result.classification if latest_result else None,
                 "latest_score": score,
                 "trajectory": reports.trajectory(scores),
-                "next_session": str(latest.next_session) if latest and latest.next_session else None,
+                "next_session": (latest.next_session.isoformat()
+                                 if latest and latest.next_session else None),
                 "last_assessment_date": latest.assessment_date if latest else None,
                 "assessment_count": len(items),
             })

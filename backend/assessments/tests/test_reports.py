@@ -225,6 +225,7 @@ class NextSessionTest(APITestCase):
         self.admin = User.objects.create_user(email="a@racco1.gov.ph", username="a", password="pass1234", role=self.admin_role)
         self.psy = User.objects.create_user(email="p@racco1.gov.ph", username="p", password="pass1234", role=self.psy_role)
         self.other = User.objects.create_user(email="o@racco1.gov.ph", username="o", password="pass1234", role=self.psy_role)
+        self.staff = User.objects.create_user(email="s@racco1.gov.ph", username="s", password="pass1234", role=Role.objects.create(role_name=Role.STAFF))
         self.child = Child.objects.create(fullname="Ana", assigned_psychologist=self.psy)
         self.a = Assessment.objects.create(child=self.child, psychologist=self.psy, status="completed")
         _result(self.a, 50, "Needs Monitoring", "Medium")
@@ -256,3 +257,15 @@ class NextSessionTest(APITestCase):
         resp = self.client.get("/api/reports/monitoring/")
         ana = next(r for r in resp.data if r["child_name"] == "Ana")
         self.assertEqual(ana["next_session"], "2026-08-05")
+
+    def test_staff_cannot_schedule(self):
+        self._auth("s@racco1.gov.ph")
+        resp = self.client.patch(f"/api/assessments/{self.a.id}/schedule/", {"next_session": "2026-08-04"}, format="json")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_invalid_date_returns_400(self):
+        self._auth("p@racco1.gov.ph")
+        resp = self.client.patch(f"/api/assessments/{self.a.id}/schedule/", {"next_session": "2026-99-99"}, format="json")
+        self.assertEqual(resp.status_code, 400)
+        self.a.refresh_from_db()
+        self.assertIsNone(self.a.next_session)
