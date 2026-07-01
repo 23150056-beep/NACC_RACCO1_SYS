@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 
 class Guardian(models.Model):
@@ -73,3 +74,19 @@ class Child(models.Model):
 
     def __str__(self):
         return self.fullname
+
+
+class ProgressNote(models.Model):
+    """A dated progress/session note on a child's record (Phase 2 monitoring)."""
+    child = models.ForeignKey(Child, on_delete=models.CASCADE, related_name="progress_notes")
+    author = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="authored_progress_notes")
+    date = models.DateField(default=timezone.localdate)
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "tbl_progress_note"
+        ordering = ["-date", "-id"]

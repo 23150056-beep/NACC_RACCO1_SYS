@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from children.models import Guardian, Child
+from children.models import Guardian, Child, ProgressNote
 
 User = get_user_model()
 
@@ -34,3 +34,12 @@ class ChildSerializer(serializers.ModelSerializer):
             "psychologist", "psychologist_name",
             "guardian", "guardian_name",
         ]
+
+
+class ProgressNoteSerializer(serializers.ModelSerializer):
+    author_name = serializers.CharField(source="author.fullname", read_only=True, default=None)
+
+    class Meta:
+        model = ProgressNote
+        fields = ["id", "child", "author", "author_name", "date", "text", "created_at"]
+        read_only_fields = ["author"]

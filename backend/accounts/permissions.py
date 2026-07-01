@@ -68,3 +68,25 @@ class CanViewResults(BasePermission):
     def has_permission(self, request, view):
         return bool(request.user and request.user.is_authenticated
                     and _role_name(request) in RESULT_VIEWER_ROLES)
+
+
+class ProgressRecordAccess(BasePermission):
+    """Progress log & goals. Read: admin/staff/psychologist. Write: admin or the
+    child's assigned psychologist (Staff read-only). Object-level restricts a
+    psychologist to their assigned children's records."""
+
+    def has_permission(self, request, view):
+        if not (request.user and request.user.is_authenticated):
+            return False
+        role = _role_name(request)
+        if request.method in SAFE_METHODS:
+            return role in (Role.ADMINISTRATOR, Role.STAFF, Role.PSYCHOLOGIST)
+        return role in (Role.ADMINISTRATOR, Role.PSYCHOLOGIST)
+
+    def has_object_permission(self, request, view, obj):
+        if request.method in SAFE_METHODS:
+            return True
+        role = _role_name(request)
+        if role == Role.ADMINISTRATOR:
+            return True
+        return obj.child.assigned_psychologist_id == request.user.id
