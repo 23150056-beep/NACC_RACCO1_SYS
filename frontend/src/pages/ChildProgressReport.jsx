@@ -45,6 +45,27 @@ export default function ChildProgressReport() {
     catch (err) { toast.error(err.response?.data?.detail || 'Could not delete.'); }
   };
 
+  const [goals, setGoals] = useState([]);
+  const [goalText, setGoalText] = useState('');
+
+  const loadGoals = () => api.get(`/goals/?child=${id}`).then((r) => setGoals(r.data)).catch(() => {});
+  useEffect(() => { loadGoals(); /* eslint-disable-next-line */ }, [id]);
+
+  const addGoal = async () => {
+    if (!goalText.trim()) return;
+    try { await api.post('/goals/', { child: Number(id), text: goalText.trim() }); setGoalText(''); loadGoals(); toast.success('Goal added'); }
+    catch (err) { toast.error(err.response?.data?.detail || 'Could not add goal.'); }
+  };
+  const toggleGoal = async (g) => {
+    try { await api.patch(`/goals/${g.id}/`, { status: g.status === 'met' ? 'ongoing' : 'met' }); loadGoals(); }
+    catch (err) { toast.error(err.response?.data?.detail || 'Could not update goal.'); }
+  };
+  const deleteGoal = async (goalId) => {
+    if (!window.confirm('Delete this goal?')) return;
+    try { await api.delete(`/goals/${goalId}/`); loadGoals(); toast.success('Goal deleted'); }
+    catch (err) { toast.error(err.response?.data?.detail || 'Could not delete.'); }
+  };
+
   const load = () => api.get(`/reports/child/${id}/`).then((r) => setData(r.data)).catch(() => setData('error'));
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 
@@ -157,6 +178,33 @@ export default function ChildProgressReport() {
           <p style={{ fontSize: 13.5, lineHeight: 1.6, color: 'var(--text-strong)', margin: '4px 0 0' }}>{latest.notes || '—'}</p>
         </Card>
       )}
+
+      <Card eyebrow="Treatment goals" title="Goals" padding="20px" style={{ marginTop: 18 }}>
+        {canWrite && (
+          <div style={{ display: 'flex', gap: 10, marginBottom: goals.length ? 16 : 0 }} className="racco-no-print">
+            <input value={goalText} onChange={(e) => setGoalText(e.target.value)} placeholder="Add a treatment goal…"
+              style={{ flex: 1, padding: '9px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'var(--font-sans)', fontSize: 14 }} />
+            <Button variant="primary" onClick={addGoal} iconLeft={<Icon name="plus" size={16} />} disabled={!goalText.trim()}>Add</Button>
+          </div>
+        )}
+        {goals.length === 0 ? (
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>No goals set yet.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {goals.map((g) => (
+              <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 'var(--radius-md)', background: 'var(--ink-50)', border: '1px solid var(--border)' }}>
+                <button title={g.status === 'met' ? 'Mark ongoing' : 'Mark met'} disabled={!canWrite} onClick={() => toggleGoal(g)}
+                  className="racco-no-print" style={{ ...iconBtn(g.status === 'met' ? 'var(--success-600)' : 'var(--text-faint)'), cursor: canWrite ? 'pointer' : 'default' }}>
+                  <Icon name={g.status === 'met' ? 'check-circle-2' : 'circle'} size={18} />
+                </button>
+                <span style={{ flex: 1, fontSize: 13.5, color: 'var(--text-strong)', textDecoration: g.status === 'met' ? 'line-through' : 'none', opacity: g.status === 'met' ? 0.7 : 1 }}>{g.text}</span>
+                <Badge tone={g.status === 'met' ? 'success' : 'neutral'} size="sm">{g.status === 'met' ? 'Met' : 'Ongoing'}</Badge>
+                {canWrite && <button title="Delete goal" onClick={() => deleteGoal(g.id)} className="racco-no-print" style={iconBtn('var(--red-500)')}><Icon name="trash-2" size={14} /></button>}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
 
       <Card eyebrow="Progress log" title="Session notes" padding="20px" style={{ marginTop: 18 }}>
         {canWrite && (
