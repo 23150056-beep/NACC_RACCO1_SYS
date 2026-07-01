@@ -77,9 +77,11 @@ class ProgressNoteViewSet(viewsets.ModelViewSet):
     serializer_class = ProgressNoteSerializer
 
     def get_queryset(self):
-        qs = ProgressNote.objects.select_related("author", "child").order_by("-date", "-id")
+        qs = ProgressNote.objects.select_related("author", "child")
         child_id = self.request.query_params.get("child")
         if child_id:
+            if not str(child_id).isdigit():
+                return qs.none()
             qs = qs.filter(child_id=child_id)
         role = getattr(getattr(self.request.user, "role", None), "role_name", None)
         if role == Role.PSYCHOLOGIST:
@@ -95,6 +97,7 @@ class ProgressNoteViewSet(viewsets.ModelViewSet):
         raise PermissionDenied("You can only add progress notes for your assigned children.")
 
     def perform_create(self, serializer):
+        # has_permission already gate-checked the role; this enforces per-child assignment at create time.
         self._assert_can_write(serializer.validated_data["child"])
         obj = serializer.save(author=self.request.user)
         log_activity(self.request.user, ActivityLog.CREATED, ActivityLog.RECORD,

@@ -41,5 +41,5 @@ class ProgressNoteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProgressNote
-        fields = ["id", "child", "author", "author_name", "date", "text", "created_at"]
+        fields = ["id", "child", "author", "author_name", "date", "text", "created_at", "updated_at"]
         read_only_fields = ["author"]

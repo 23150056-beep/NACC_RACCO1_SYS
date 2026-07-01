@@ -58,5 +58,13 @@ class ProgressNoteApiTest(APITestCase):
         note = ProgressNote.objects.create(child=self.mine, author=self.psy, text="mine")
         self._auth("o@racco1.gov.ph")
         resp = self.client.delete(f"/api/progress-notes/{note.id}/")
-        self.assertIn(resp.status_code, (403, 404))
+        self.assertEqual(resp.status_code, 404)
         self.assertEqual(ProgressNote.objects.count(), 1)
+
+    def test_other_psychologist_cannot_update(self):
+        note = ProgressNote.objects.create(child=self.mine, author=self.psy, text="mine")
+        self._auth("o@racco1.gov.ph")
+        resp = self.client.patch(f"/api/progress-notes/{note.id}/", {"text": "hack"}, format="json")
+        self.assertEqual(resp.status_code, 404)
+        note.refresh_from_db()
+        self.assertEqual(note.text, "mine")
